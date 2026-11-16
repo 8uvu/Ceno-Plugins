@@ -1,0 +1,31 @@
+{
+    "format": 1,
+    "name": "FakeDM",
+    "description": "Fake messages and calls in the chat you have open. Drawn locally, never sent.",
+    "plugins": {
+        "dev.8uvu.fake-dm": {
+            "name": "FakeDM",
+            "description": "Fake messages and calls in the chat you have open. Drawn locally, never sent.",
+            "icon": "MessageIcon",
+            "author": "cenotaph",
+            "channels": {
+                "latest": "6.0.9"
+            },
+            "versions": {
+                "6.0.9": {
+                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.fake-dm@6.0.9.zip",
+                    "sha256": "e3783f35b11f6a0bb22c34221bb5ac64ef6694fa485fb28b4959ef79d339214f",
+                    "size": 25403,
+                    "dependencies": {
+                        "valenced.api": {
+                            "version": ">=1 <2"
+                        },
+                        "discord": {
+                            "version": "*"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

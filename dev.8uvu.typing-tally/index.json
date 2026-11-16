@@ -1,0 +1,31 @@
+{
+    "format": 1,
+    "name": "TypingTally",
+    "description": "Counts how often you start typing in each channel today. Stays on this device.",
+    "plugins": {
+        "dev.8uvu.typing-tally": {
+            "name": "TypingTally",
+            "description": "Counts how often you start typing in each channel today. Stays on this device.",
+            "icon": "PencilIcon",
+            "author": "cenotaph",
+            "channels": {
+                "latest": "1.0.11"
+            },
+            "versions": {
+                "1.0.11": {
+                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-tally@1.0.11.zip",
+                    "sha256": "bc0ae775a3ffe307d84cf684b2808f3511217f163ec9b474b2dc6abeb7c41304",
+                    "size": 3859,
+                    "dependencies": {
+                        "valenced.api": {
+                            "version": ">=1 <2"
+                        },
+                        "discord": {
+                            "version": "*"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

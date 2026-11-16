@@ -1,0 +1,31 @@
+{
+    "format": 1,
+    "name": "Clean URLs",
+    "description": "Strips tracking parameters from links.",
+    "plugins": {
+        "dev.8uvu.clean-urls": {
+            "name": "Clean URLs",
+            "description": "Strips tracking parameters from links.",
+            "icon": "LinkIcon",
+            "author": "cenotaph",
+            "channels": {
+                "latest": "1.1.11"
+            },
+            "versions": {
+                "1.1.11": {
+                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.clean-urls@1.1.11.zip",
+                    "sha256": "c3617e41ab4a1e5c5e278ab66b96d8ac03500b65dea2d8743948bba55067e738",
+                    "size": 4409,
+                    "dependencies": {
+                        "valenced.api": {
+                            "version": ">=1 <2"
+                        },
+                        "discord": {
+                            "version": "*"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

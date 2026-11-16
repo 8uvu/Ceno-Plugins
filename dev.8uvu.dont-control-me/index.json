@@ -1,0 +1,31 @@
+{
+    "format": 1,
+    "name": "Don't Control Me",
+    "description": "Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission.",
+    "plugins": {
+        "dev.8uvu.dont-control-me": {
+            "name": "Don't Control Me",
+            "description": "Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission.",
+            "icon": "MicrophoneIcon",
+            "author": "cenotaph",
+            "channels": {
+                "latest": "1.1.8"
+            },
+            "versions": {
+                "1.1.8": {
+                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.1.8.zip",
+                    "sha256": "821dc8b174057cd3f0617c005f0f0c5a94e124abc2ddbc2db8fe8bc7d7163695",
+                    "size": 5245,
+                    "dependencies": {
+                        "valenced.api": {
+                            "version": ">=1 <2"
+                        },
+                        "discord": {
+                            "version": "*"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
