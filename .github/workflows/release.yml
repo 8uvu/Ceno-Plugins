@@ -4,8 +4,7 @@
 name: Release plugins
 
 on:
-  push:
-    branches: [main]
+  # Manual until the pipeline is verified against these sources.
   workflow_dispatch:
 
 concurrency:

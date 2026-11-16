@@ -1,0 +1,20 @@
+{
+    "format": 1,
+    "id": "dev.8uvu.typing-watch",
+    "name": "TypingWatch",
+    "description": "Remembers who started typing, in case the indicator vanished before you looked.",
+    "author": "cenotaph",
+    "icon": "EyeIcon",
+    "version": "1.0.12",
+    "dependencies": {
+        "valenced.api": {
+            "version": ">=1 <2"
+        },
+        "discord": {
+            "version": "*"
+        }
+    },
+    "dist": {
+        "script": "index.js"
+    }
+}
