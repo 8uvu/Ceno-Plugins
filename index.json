@@ -1,7 +1,7 @@
 {
     "format": 1,
-    "name": "8uvu plugins",
-    "description": "Small Valenced plugins by 8uvu",
+    "name": "Ceno Plugins",
+    "description": "Small Valenced plugins by cenotaph.",
     "icon": "WrenchIcon",
     "plugins": {
         "dev.8uvu.clean-urls": {
