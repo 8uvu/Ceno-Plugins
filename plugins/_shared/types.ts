@@ -16,6 +16,8 @@ export interface DiscordUser {
 
 export interface DiscordChannel {
 	id: Snowflake
+	// 1 is a DM, 3 a group DM, 0 a guild text channel.
+	type?: number
 	name?: string
 	guild_id?: Snowflake
 	guildId?: Snowflake

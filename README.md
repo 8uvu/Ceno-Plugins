@@ -21,6 +21,7 @@ from the list. Updates come through the same repository.
 | **TypingTally** | Counts how often you start typing in each channel today. Stays on this device. | 1.0.11 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
+| **Streaks** | Counts how many days in a row you and someone messaged each other. Stays on this device. | 1.0.0 |
 
 ## Layout
 
@@ -37,6 +38,7 @@ plugins/
 ├── typing-tally/
 ├── clean-urls/
 ├── dont-control-me/
+├── streaks/
 └── _shared/                     # theme tokens and shared runtime types
 themes/                          # theme plugins, built and packaged like plugins/
 types/                           # declarations for the @valenced/* imports
