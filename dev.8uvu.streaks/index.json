@@ -1,0 +1,31 @@
+{
+    "format": 1,
+    "name": "Streaks",
+    "description": "Counts how many days in a row you and someone messaged each other. Stored on this device only.",
+    "plugins": {
+        "dev.8uvu.streaks": {
+            "name": "Streaks",
+            "description": "Counts how many days in a row you and someone messaged each other. Stored on this device only.",
+            "icon": "MessageIcon",
+            "author": "cenotaph",
+            "channels": {
+                "latest": "1.0.0"
+            },
+            "versions": {
+                "1.0.0": {
+                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.streaks@1.0.0.zip",
+                    "sha256": "3fb58a159722d021eca23e30f5f09249f3894eaab038dbb40bb04dd775f3b641",
+                    "size": 5223,
+                    "dependencies": {
+                        "valenced.api": {
+                            "version": ">=1 <2"
+                        },
+                        "discord": {
+                            "version": "*"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
