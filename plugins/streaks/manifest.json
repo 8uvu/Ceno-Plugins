@@ -2,10 +2,10 @@
     "format": 1,
     "id": "dev.8uvu.streaks",
     "name": "Streaks",
-    "description": "Counts how many days in a row you and someone messaged each other. Stored on this device only.",
+    "description": "Counts how many days in a row you have talked to someone, and shows the streak next to their name in the chat. Stored on this device only.",
     "author": "cenotaph",
     "icon": "MessageIcon",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "dependencies": {
         "valenced.api": {
             "version": ">=1 <2"
