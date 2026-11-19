@@ -1,20 +1,23 @@
 // Streaks, by cenotaph. Counts how many days in a row you have talked to
 // someone, entirely on this device: no account, no server, no token. A day
-// counts once a message went each way, so it tracks a conversation and not
-// just your own activity.
+// counts as soon as any message went out or came in, so texting someone starts
+// the streak, and the count is drawn next to their name in the chat.
+import * as ImportTracker from '@valenced/discord/common/import-tracker'
 import { Design } from '@valenced/discord/design'
-import {
-	getStore,
-	onFluxEventDispatched,
-	Stores,
-} from '@valenced/discord/flux'
+import { getStore, onFluxEventDispatched, Stores } from '@valenced/discord/flux'
+import * as PathFinders from '@valenced/discord/utils/modules/finders'
+import { after } from '@valenced/patcher'
+import { isValidElement } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { settingsScroll, token } from '../../_shared/theme'
+import { asRecord } from '../../_shared/types'
 import type {
 	DesignShim,
 	DiscordChannel,
 	JsonStorage,
+	Logger,
 	MessageCreatePayload,
+	ModuleWithType,
 	StoreLike,
 } from '../../_shared/types'
 
@@ -31,16 +34,37 @@ interface Conversation {
 
 interface Settings {
 	enabled: boolean
+	// A day counts once each side has written. Off by default: one message is
+	// enough for the day, so the streak actually starts when you text someone.
 	bothSides: boolean
+	// Draws the streak next to the other person's name in the chat.
+	badge: boolean
 	conversations: Record<string, Conversation>
 }
 
-const DEFAULTS: Settings = { enabled: true, bothSides: true, conversations: {} }
+const DEFAULTS: Settings = {
+	enabled: true,
+	bothSides: false,
+	badge: true,
+	conversations: {},
+}
 // Enough history for a year-long streak without the storage file growing
 // forever.
 const KEEP_DAYS = 400
 const DM = 1
 const GROUP_DM = 3
+const BADGE_KEY = 'streaks-badge'
+
+// Where the name of the chat is drawn. Discord renames these files between
+// releases, so the import map is searched first and these are the fallbacks.
+const HEADER_CANDIDATES = [
+	'modules/channels/native/ChannelHeader.tsx',
+	'modules/channels/native/ChannelTitle.tsx',
+	'modules/channels/native/DMChannelHeader.tsx',
+	'modules/channels/native/direct_messages/ChannelHeader.tsx',
+	'modules/channels/native/header/ChannelHeader.tsx',
+	'modules/messages/native/ChannelHeader.tsx',
+]
 
 export function dayKey(at: number): string {
 	const date = new Date(at)
@@ -117,7 +141,7 @@ export function record(
 	const streak = currentStreak(
 		{ ...conversation, days },
 		key,
-		current.bothSides !== false,
+		current.bothSides === true,
 	)
 	return {
 		conversations: {
@@ -143,7 +167,7 @@ export function ranked(
 	current: Settings,
 	today: string,
 ): Ranked[] {
-	const bothSides = current.bothSides !== false
+	const bothSides = current.bothSides === true
 	return Object.entries(current.conversations ?? {})
 		.map(([id, conversation]) => ({
 			id,
@@ -210,9 +234,212 @@ function describe(entry: Ranked): string {
 	return days + ' — ' + today + ' · best ' + entry.longest
 }
 
+// ─── The badge next to the name ──────────────────────────────────────────────
+// Discord has no way to decorate a name, so the chat header component is
+// patched and the count is inserted into its children. Every lookup and every
+// render is wrapped: a build that moved the component must lose the badge, not
+// the chat screen.
+let live: JsonStorage<Settings> | null = null
+const patched = new Set<unknown>()
+
+interface ModuleFinders {
+	getModuleWithImportedPath?(
+		path: string,
+		callback: (mod: ModuleWithType) => void,
+	): () => void
+	lookupModuleWithImportedPath?(path: string): ModuleWithType[]
+}
+
+function currentSettings(): Settings {
+	try {
+		return live?.cache ?? DEFAULTS
+	} catch {
+		return DEFAULTS
+	}
+}
+
+function streakFor(channelId: string): number {
+	if (!channelId) return 0
+	const settings = currentSettings()
+	if (settings.enabled === false) return 0
+	const conversation = settings.conversations?.[channelId]
+	if (!conversation) return 0
+	return currentStreak(
+		conversation,
+		dayKey(Date.now()),
+		settings.bothSides === true,
+	)
+}
+
+// The header keeps its chat in a different prop on each build.
+function channelIdIn(props: Record<string, unknown>): string {
+	for (const key of ['channelId', 'channel_id']) {
+		const value = props[key]
+		if (value) return String(value)
+	}
+	const channel = asRecord(props.channel)
+	if (channel.id) return String(channel.id)
+	return ''
+}
+
+function badge(streak: number) {
+	return (
+		<Text
+			key={BADGE_KEY}
+			style={{
+				color: token('TEXT_MUTED'),
+				fontSize: 12,
+				fontWeight: '600',
+				marginLeft: 6,
+			}}
+		>
+			{'🔥 ' + streak}
+		</Text>
+	)
+}
+
+function withBadge(node: unknown, streak: number): unknown {
+	if (streak <= 0 || !isValidElement(node)) return node
+	const props = asRecord((node as { props?: unknown }).props)
+	const children = props.children
+	const list: unknown[] =
+		Array.isArray(children)
+			? [...children]
+			: children === undefined || children === null
+				? []
+				: [children]
+		if (list.some(child => asRecord(child).key === BADGE_KEY)) return node
+	list.push(badge(streak))
+	return { ...(node as object), props: { ...props, children: list } }
+}
+
+function finders(): ModuleFinders | null {
+	try {
+		const candidate = PathFinders as unknown as ModuleFinders
+		if (typeof candidate?.lookupModuleWithImportedPath === 'function')
+			return candidate
+		if (typeof candidate?.getModuleWithImportedPath === 'function')
+			return candidate
+	} catch {}
+	return null
+}
+
+// Every path the running client has recorded that looks like the bar holding
+// the name. Discord records this map lazily, so it grows as screens open.
+function headerPaths(): string[] {
+	const paths: string[] = []
+	try {
+		const source = (ImportTracker as unknown as { mImportedPaths?: unknown })
+			.mImportedPaths
+		if (!(source instanceof Map)) return paths
+		source.forEach((value: unknown) => {
+			if (typeof value !== 'string') return
+			if (!/\.tsx?$/.test(value)) return
+			if (!/(header|title)/i.test(value)) return
+			if (
+				/(chat_input|settings|search|emoji|sticker|gift|attach|gallery|toast|modal|call)/i.test(
+					value,
+				)
+			)
+				return
+			paths.push(value)
+		})
+	} catch {}
+	return paths
+}
+
+// Module finders hand back either the module or an ES module namespace whose
+// `default` is the module; both spellings show up depending on the build.
+function componentOf(mod: ModuleWithType | null): ModuleWithType | null {
+	if (!mod) return null
+	if (typeof mod.type === 'function') return mod
+	const inner = asRecord(mod.default)
+	return typeof inner?.type === 'function' ? (inner as ModuleWithType) : null
+}
+
+function patchHeader(
+	mod: ModuleWithType | null,
+	cleanup: (fn: () => void) => void,
+	logger?: Logger,
+): boolean {
+	const component = componentOf(mod)
+	if (!component || typeof component.type !== 'function') return false
+	if (patched.has(component.type)) return true
+	try {
+		// The hook is handed (args, result) on current builds; older ones pass the
+		// rendered element first. Whatever goes wrong, Discord's own element is
+		// returned: a throw here would take the chat screen down.
+		const off = after(component, 'type', (...params: unknown[]) => {
+			let result: unknown = params[1] ?? params[0]
+			try {
+				const rendered = params.find(value => isValidElement(value))
+				if (rendered) result = rendered
+				if (currentSettings().badge === false) return result
+				const id = channelIdIn(asRecord(asRecord(result).props))
+				return withBadge(result, streakFor(id))
+			} catch {
+				return result
+			}
+		})
+		if (typeof off === 'function') cleanup(off as () => void)
+		patched.add(component.type)
+		return true
+	} catch (error) {
+		logger?.warn?.('[Streaks] could not patch a chat header', error)
+		return false
+	}
+}
+
+function installBadge(
+	cleanup: (fn: () => void) => void,
+	logger?: Logger,
+) {
+	const lookup = finders()
+	if (!lookup) {
+		logger?.warn?.('[Streaks] no module finders; the badge stays off')
+		return
+	}
+	const scan = (): boolean => {
+		let found = false
+		const seen = new Set<string>()
+		for (const path of [...headerPaths(), ...HEADER_CANDIDATES]) {
+			if (seen.has(path)) continue
+			seen.add(path)
+			let mod: ModuleWithType | null = null
+			try {
+				mod = (lookup.lookupModuleWithImportedPath?.(path) ?? [])[0] ?? null
+			} catch {
+				mod = null
+			}
+			if (mod && patchHeader(mod, cleanup, logger)) found = true
+		}
+		return found
+	}
+	if (scan()) {
+		logger?.log?.('[Streaks] badge installed on the chat header')
+		return
+	}
+	// The header module only exists once a chat has been opened, so the lookup is
+	// retried briefly instead of once at start.
+	let tries = 0
+	const timer = setInterval(() => {
+		if (scan()) {
+			clearInterval(timer)
+			logger?.log?.('[Streaks] badge installed on the chat header')
+			return
+		}
+		if (++tries > 40) {
+			clearInterval(timer)
+			logger?.warn?.('[Streaks] no chat header found; the badge stays off')
+		}
+	}, 1500)
+	cleanup(() => clearInterval(timer))
+}
+
 export default plugin<{ jsonStorage: Settings }>({
 	jsonStorage: { load: true, default: DEFAULTS },
 	start({ cleanup, jsonStorage, logger }) {
+		live = jsonStorage
 		cleanup(
 			// A listener only: the payload goes back untouched.
 			onFluxEventDispatched(
@@ -246,6 +473,12 @@ export default plugin<{ jsonStorage: Settings }>({
 				},
 			),
 		)
+		try {
+			patched.clear()
+			installBadge(cleanup, logger)
+		} catch (error) {
+			logger?.warn?.('[Streaks] the chat badge is unavailable', error)
+		}
 		logger?.log?.('[Streaks] started')
 	},
 	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
@@ -276,16 +509,24 @@ export default plugin<{ jsonStorage: Settings }>({
 						{D.TableSwitchRow ? (
 							<D.TableSwitchRow
 								label="Track streaks"
-								subLabel="Counts the days you and someone messaged each other. Stored on this device only."
+								subLabel="Counts the days you and someone talked. Stored on this device only."
 								value={settings.enabled !== false}
 								onValueChange={(v: boolean) => set({ enabled: v })}
 							/>
 						) : null}
 						{D.TableSwitchRow ? (
 							<D.TableSwitchRow
+								label="Show the streak in chat"
+								subLabel="Draws the count next to the other person's name."
+								value={settings.badge !== false}
+								onValueChange={(v: boolean) => set({ badge: v })}
+							/>
+						) : null}
+						{D.TableSwitchRow ? (
+							<D.TableSwitchRow
 								label="Both sides count"
-								subLabel="A day counts once each of you sent something. Turn off to count any message."
-								value={settings.bothSides !== false}
+								subLabel="A day counts once each of you sent something. Off counts any message."
+								value={settings.bothSides === true}
 								onValueChange={(v: boolean) => set({ bothSides: v })}
 							/>
 						) : null}
@@ -327,6 +568,15 @@ export default plugin<{ jsonStorage: Settings }>({
 				>
 					<Text style={{ color: normal }}>
 						Track streaks: {settings.enabled !== false ? 'on' : 'off'}
+					</Text>
+				</Pressable>
+				<Pressable
+					accessibilityLabel="Show the streak in chat"
+					onPress={() => set({ badge: !(settings.badge !== false) })}
+					style={{ paddingVertical: 8 }}
+				>
+					<Text style={{ color: normal }}>
+						Show the streak in chat: {settings.badge !== false ? 'on' : 'off'}
 					</Text>
 				</Pressable>
 				<Pressable
