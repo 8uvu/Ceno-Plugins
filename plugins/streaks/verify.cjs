@@ -1,6 +1,7 @@
-// Verifies Streaks: a message each way counts the day, yesterday plus today is
-// a two-day streak, guild channels are ignored, the switch stops counting, a
-// reset clears, and stopping puts the flux listener back.
+// Verifies Streaks: one message from either side counts the day, yesterday plus
+// today is a two-day streak, both-sides mode still needs a reply, guild channels
+// are ignored, the switch stops counting, a reset clears, and stopping puts the
+// flux listener back.
 const { createSandbox, loadBundle, textOf, tick } = require('../../scripts/valenced-harness.cjs');
 
 function key(at) {
@@ -38,17 +39,17 @@ async function main() {
     const today = key(Date.now());
     const yesterday = key(Date.now() - 24 * 60 * 60 * 1000);
 
+    // One message from the other person is enough to start the streak.
     const payload = message('dm1', 'friend');
     const returned = sandbox.emit('MESSAGE_CREATE', payload);
     if (returned !== payload) throw new Error('the event must be passed through untouched');
-    sandbox.emit('MESSAGE_CREATE', message('dm1', 'me'));
     sandbox.emit('MESSAGE_CREATE', message('guild1', 'me'));
     await tick();
 
     const convo = (sandbox.stored.conversations ?? {}).dm1;
     if (!convo) throw new Error('the DM was not recorded: ' + JSON.stringify(sandbox.stored));
     const day = convo.days[today] ?? {};
-    if (day.in !== 1 || day.out !== 1) throw new Error('today not counted both ways: ' + JSON.stringify(day));
+    if (day.in !== 1 || day.out !== 0) throw new Error('today not counted from one message: ' + JSON.stringify(day));
     if (convo.name !== 'friend') throw new Error('conversation not named after the other person: ' + convo.name);
     if ((sandbox.stored.conversations ?? {}).guild1) throw new Error('a guild channel was counted');
 
@@ -57,31 +58,25 @@ async function main() {
         if (!text.includes(expected)) throw new Error('settings UI missing: ' + expected);
     }
 
-    // Yesterday counts too, so the same conversation is on a two-day streak.
+    // A one-sided day yesterday still counts, so the same conversation is on a
+    // two-day streak.
     await sandbox.api.jsonStorage.set({
         conversations: {
             dm1: {
                 name: 'friend',
-                longest: 1,
-                days: { [yesterday]: { in: 1, out: 1 }, [today]: { in: 1, out: 1 } },
+                longest: 2,
+                days: { [yesterday]: { in: 1, out: 0 }, [today]: { in: 1, out: 0 } },
             },
         },
     });
     text = textOf(inst.SettingsComponent({ api: sandbox.api }));
     if (!text.includes('2 days')) throw new Error('two-day streak not shown: ' + text.slice(0, 400));
 
-    // Only one side today: the day should not extend the streak.
-    await sandbox.api.jsonStorage.set({
-        conversations: {
-            dm1: {
-                name: 'friend',
-                longest: 2,
-                days: { [yesterday]: { in: 1, out: 1 }, [today]: { in: 3, out: 0 } },
-            },
-        },
-    });
+    // With both sides switched on, a one-sided day no longer extends it.
+    await sandbox.api.jsonStorage.set({ bothSides: true });
     text = textOf(inst.SettingsComponent({ api: sandbox.api }));
-    if (text.includes('2 days')) throw new Error('a one-sided day extended the streak');
+    if (text.includes('2 days')) throw new Error('a one-sided day extended the streak with both sides on');
+    await sandbox.api.jsonStorage.set({ bothSides: false });
 
     await sandbox.api.jsonStorage.set({ enabled: false });
     sandbox.emit('MESSAGE_CREATE', message('dm1', 'me'));
@@ -96,7 +91,7 @@ async function main() {
     await inst.stop?.();
     for (const cleanup of sandbox.cleanups) cleanup();
     if (sandbox.fluxHandlers.has('MESSAGE_CREATE')) throw new Error('unpatch left the flux handler behind');
-    console.log('VERIFY OK: both sides counted, streak spans days, guild skipped, switch and reset honoured');
+    console.log('VERIFY OK: one message starts a day, streak spans days, both-sides mode honoured, guild skipped, switch and reset honoured');
 }
 
 main().catch((error) => {
