@@ -20,7 +20,7 @@ from the list. Updates come through the same repository.
 | **TypingWatch** | Remembers who started typing, in case the indicator disappeared before you looked. | 1.0.12 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
-| **Streaks** | Counts how many days in a row you and someone messaged each other. Stays on this device. | 1.0.0 |
+| **Streaks** | Counts how many days in a row you have talked to someone and shows the count next to their name. Stays on this device. | 1.1.0 |
 
 ## Layout
 
