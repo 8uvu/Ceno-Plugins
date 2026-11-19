@@ -18,7 +18,6 @@ from the list. Updates come through the same repository.
 | --- | --- | --- |
 | **FakeDM** | Fake messages and calls in the chat you have open. Drawn locally, never sent. | 6.0.9 |
 | **TypingWatch** | Remembers who started typing, in case the indicator disappeared before you looked. | 1.0.12 |
-| **TypingTally** | Counts how often you start typing in each channel today. Stays on this device. | 1.0.11 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
 | **Streaks** | Counts how many days in a row you and someone messaged each other. Stays on this device. | 1.0.0 |
@@ -35,7 +34,6 @@ plugins/
 │   ├── tsconfig.json            # the plugin's own type-check project
 │   └── js/index.tsx             # -> index.js
 ├── typing-watch/
-├── typing-tally/
 ├── clean-urls/
 ├── dont-control-me/
 ├── streaks/
