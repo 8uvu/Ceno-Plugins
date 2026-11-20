@@ -29,17 +29,30 @@
     },
     "dev.8uvu.dm-deleter": {
       "name": "DM Deleter",
-      "description": "Deletes your own messages in a DM, one at a time with uneven pauses, and waits out rate limits so a big cleanup does not get your account flagged.",
+      "description": "Hold a DM to see its messages, pick the ones you sent, and delete them one at a time with uneven pauses, waiting out rate limits so a cleanup does not get your account flagged.",
       "author": "cenotaph",
       "icon": "TrashIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@1.0.0.zip",
           "sha256": "345d6d393001739668cea43108546aeac0c1c63ec827003544530b8017bf0972",
           "size": 4229,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@1.1.0.zip",
+          "sha256": "9c5aeb6b836ae76ffa56c53e76af085b6d18d209b36830a565e3b03b88e9e8f0",
+          "size": 6028,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
