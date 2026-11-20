@@ -22,7 +22,7 @@ import {
 	withName,
 	withProps,
 } from '@valenced/modules/finders/filters'
-import * as Metro from '@valenced/modules/metro/subscriptions'
+import * as Metro from '@valenced/discord/utils/modules/metro/subscriptions'
 import { after } from '@valenced/patcher'
 import { cloneElement, createElement, isValidElement, useState } from 'react'
 import {
