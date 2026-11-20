@@ -1,8 +1,9 @@
-// DM Deleter, by cenotaph. Deletes the messages you sent in a DM, one at a
-// time: every delete is followed by an uneven pause, a rate limit is waited
-// out instead of hammered, and anything newer than the cutoff is left alone.
-// Nothing from the other side is touched, because Discord does not let one
-// account delete another account's messages anyway.
+// DM Deleter, by cenotaph. Hold a conversation in the plugin's settings to
+// open its messages, see what is in it, pick the ones you sent, and delete
+// them one at a time: every delete is followed by an uneven pause, a rate
+// limit is waited out instead of hammered, and anything newer than the cutoff
+// is left alone. Nothing from the other side is touched, because Discord does
+// not let one account delete another account's messages anyway.
 //
 // Everything goes through Discord's own message actions (found at runtime), so
 // the login token never leaves the client and the client's own request queue
@@ -27,7 +28,6 @@ interface Settings {
 	// 0 turns the age filter off; anything else is a number of days.
 	olderThanDays: number
 }
-
 const DEFAULTS: Settings = {
 	enabled: true,
 	delayMs: 2500,
@@ -43,11 +43,9 @@ const DM = 1
 const GROUP_DM = 3
 
 let log: Logger | undefined
-
 // ─── Progress ────────────────────────────────────────────────────────────────
-// The settings page is the only screen this plugin has, so the run counters
-// live in the module and the page subscribes to them.
-
+// Both screens live in the same settings page, so the run counters live in the
+// module and the page subscribes to them.
 interface Progress {
 	active: boolean
 	channel: string
@@ -69,7 +67,6 @@ const IDLE: Progress = {
 let progress: Progress = { ...IDLE }
 let stopping = false
 const listeners = new Set<() => void>()
-
 function publish(patch: Partial<Progress>) {
 	progress = { ...progress, ...patch }
 	for (const listener of listeners) {
@@ -111,7 +108,6 @@ function useProgress(): Progress {
 	}, [])
 	return progress
 }
-
 // ─── Discord internals ───────────────────────────────────────────────────────
 
 function store(name: string): StoreLike | null {
@@ -127,6 +123,15 @@ function store(name: string): StoreLike | null {
 	return null
 }
 
+function currentUserId(): string {
+	try {
+		const me = asRecord(store('UserStore')?.getCurrentUser?.())
+		return String(me.id ?? '')
+	} catch {
+		return ''
+	}
+}
+
 interface ChannelStoreLike extends StoreLike {
 	getSortedPrivateChannels?(): unknown[]
 	getDMUserIds?(): string[]
@@ -140,7 +145,6 @@ interface MessageActionsLike {
 
 let actions: MessageActionsLike | null = null
 let history: ((...args: unknown[]) => unknown) | null = null
-
 // The message action module is found by its exports, not by a path: Discord
 // moves files between releases but keeps sendMessage and deleteMessage together.
 function resolveActions(): MessageActionsLike | null {
@@ -187,14 +191,12 @@ function userName(id: string): string {
 	} catch {}
 	return ''
 }
-
 function conversationName(channel: Record<string, unknown>): string {
 	const recipients = Array.isArray(channel.recipients) ? channel.recipients : []
 	const names: string[] = []
 	for (const entry of recipients) {
 		const inline = asRecord(entry)
-		const id =
-			typeof entry === 'string' ? entry : String(inline.id ?? '')
+		const id = typeof entry === 'string' ? entry : String(inline.id ?? '')
 		const direct = inline.globalName ?? inline.global_name ?? inline.username
 		const name =
 			typeof direct === 'string' && direct ? direct : id ? userName(id) : ''
@@ -205,7 +207,6 @@ function conversationName(channel: Record<string, unknown>): string {
 	if (typeof fallback === 'string' && fallback) return fallback
 	return 'DM ' + String(channel.id ?? '').slice(-4)
 }
-
 interface Conversation {
 	id: string
 	name: string
@@ -241,12 +242,78 @@ function conversations(): Conversation[] {
 	return list
 }
 
+// ─── One message ─────────────────────────────────────────────────────────────
+// What the message list shows, and what a delete acts on.
+interface Item {
+	id: string
+	mine: boolean
+	author: string
+	text: string
+	at: number
+	tooNew: boolean
+}
+
+function pad(value: number): string {
+	return (value < 10 ? '0' : '') + value
+}
+
+function when(at: number): string {
+	if (!at) return ''
+	const date = new Date(at)
+	return (
+		date.getFullYear() +
+		'-' +
+		pad(date.getMonth() + 1) +
+		'-' +
+		pad(date.getDate()) +
+		' ' +
+		pad(date.getHours()) +
+		':' +
+		pad(date.getMinutes())
+	)
+}
+
+function toItem(raw: unknown, me: string, cutoff: number): Item | null {
+	const message = asRecord(raw)
+	const id = String(message.id ?? '')
+	if (!id) return null
+	const author = asRecord(message.author)
+	const authorId = String(author.id ?? '')
+	const named =
+		author.globalName ?? author.global_name ?? author.username ?? author.name
+	const at = Date.parse(String(message.timestamp ?? ''))
+	const files = Array.isArray(message.attachments)
+		? message.attachments.length
+		: 0
+	const embeds = Array.isArray(message.embeds) ? message.embeds.length : 0
+	let text = typeof message.content === 'string' ? message.content.trim() : ''
+	if (!text && files)
+		text = files === 1 ? '1 attachment' : files + ' attachments'
+	if (!text && embeds) text = embeds === 1 ? '1 embed' : embeds + ' embeds'
+	if (!text) text = '(no text)'
+	const mine = authorId === me
+	const time = Number.isFinite(at) ? at : 0
+	return {
+		id,
+		mine,
+		author: mine
+			? 'You'
+			: typeof named === 'string' && named
+				? named
+				: authorId
+					? userName(authorId) || 'someone'
+					: 'unknown',
+		text,
+		at: time,
+		tooNew: cutoff > 0 && time > 0 && time > cutoff,
+	}
+}
+
 // ─── Pacing ──────────────────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, ms))
 }
-
 function pauseFor(settings: Settings): number {
 	const base = Math.max(500, Number(settings.delayMs) || DEFAULTS.delayMs)
 	if (settings.jitter === false) return base
@@ -316,8 +383,49 @@ async function fetchPage(channelId: string, before: string): Promise<unknown[]> 
 	return []
 }
 
-// ─── The run ─────────────────────────────────────────────────────────────────
+// ─── The runs ────────────────────────────────────────────────────────────────
 
+// Delete the picked messages, in order, at the configured pace. `removed` is
+// called after each one so the open list drops it straight away.
+async function remove(
+	conversation: Conversation,
+	ids: string[],
+	settings: Settings,
+	removed: (id: string) => void,
+): Promise<void> {
+	stopping = false
+	publish({
+		...IDLE,
+		active: true,
+		channel: conversation.name,
+		note: 'deleting ' + ids.length + ' message(s)',
+	})
+	try {
+		if (!resolveActions()) throw new Error('this build does not expose message actions')
+		for (let index = 0; index < ids.length; index++) {
+			if (stopping) break
+			const outcome = await erase(conversation.id, ids[index])
+			if (outcome === 'deleted' || outcome === 'gone') {
+				publish({ deleted: progress.deleted + 1 })
+				removed(ids[index])
+			} else {
+				publish({ failed: progress.failed + 1 })
+			}
+			if (index === ids.length - 1 || stopping) continue
+			const pause = pauseFor(settings)
+			note('waiting ' + (pause / 1000).toFixed(1) + ' s')
+			await sleep(pause)
+		}
+		publish({ active: false, note: summary(stopping ? 'stopped' : 'finished') })
+		log?.log?.('[DM Deleter] ' + conversation.name + ': ' + progress.note)
+	} catch (error) {
+		publish({ active: false, note: 'stopped: ' + errorMessage(error) })
+		log?.warn?.('[DM Deleter] ' + errorMessage(error))
+	}
+}
+
+// The whole conversation at once: pages back to the start and deletes every
+// message you sent that the age limit allows.
 async function clear(
 	conversation: Conversation,
 	settings: Settings,
@@ -334,7 +442,7 @@ async function clear(
 			? Date.now() - settings.olderThanDays * DAY
 			: 0
 	try {
-		const me = String(store('UserStore')?.getCurrentUser?.()?.id ?? '')
+		const me = currentUserId()
 		if (!me) throw new Error('could not read your account')
 		let before = ''
 		const seen = new Set<string>()
@@ -356,8 +464,9 @@ async function clear(
 				if (!id || seen.has(id)) continue
 				seen.add(id)
 				const outcome = await erase(conversation.id, id)
-				if (outcome === 'deleted') publish({ deleted: progress.deleted + 1 })
-				else if (outcome === 'refused') publish({ failed: progress.failed + 1 })
+				if (outcome === 'deleted' || outcome === 'gone')
+					publish({ deleted: progress.deleted + 1 })
+				else publish({ failed: progress.failed + 1 })
 				const pause = pauseFor(settings)
 				note('waiting ' + (pause / 1000).toFixed(1) + ' s')
 				await sleep(pause)
@@ -374,10 +483,10 @@ async function clear(
 	}
 }
 
-function confirmDelete(name: string, run: () => void) {
+function confirmDelete(what: string, run: () => void) {
 	const body =
-		'Deletes the messages you sent in ' +
-		name +
+		'Deletes ' +
+		what +
 		', one at a time with a pause between each. This cannot be undone.'
 	try {
 		Alert.alert('Delete your messages?', body, [
@@ -390,12 +499,94 @@ function confirmDelete(name: string, run: () => void) {
 	}
 }
 
+// ─── Small pieces of UI ──────────────────────────────────────────────────────
+
+function Chip(props: {
+	label: string
+	onPress?: () => void
+	danger?: boolean
+	disabled?: boolean
+}): ReactNode {
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={props.label}
+			disabled={props.disabled === true}
+			onPress={props.onPress}
+			style={{
+				backgroundColor: token('BACKGROUND_SECONDARY'),
+				borderRadius: 10,
+				opacity: props.disabled === true ? 0.45 : 1,
+				paddingHorizontal: 12,
+				paddingVertical: 9,
+			}}
+		>
+			<Text
+				style={{
+					color: props.danger === true ? token('TEXT_DANGER') : token('TEXT_NORMAL'),
+					fontWeight: '600',
+				}}
+			>
+				{props.label}
+			</Text>
+		</Pressable>
+	)
+}
+
+// One message in the open conversation: the pick box, who sent it and when, and
+// what it said. Anything that cannot be deleted still shows, greyed out.
+function MessageRow(props: {
+	item: Item
+	picked: boolean
+	onPress: () => void
+}): ReactNode {
+	const { item, picked } = props
+	const pickable = item.mine && !item.tooNew
+	const tint = pickable ? token('TEXT_NORMAL') : token('TEXT_MUTED')
+	return (
+		<Pressable
+			accessibilityRole="button"
+			accessibilityLabel={item.author + ': ' + item.text}
+			onPress={props.onPress}
+			style={{ flexDirection: 'row', gap: 10, paddingVertical: 9 }}
+		>
+			<Text
+				style={{
+					color: picked ? token('BRAND_500') : tint,
+					fontSize: 16,
+				}}
+			>
+				{picked ? '☑' : pickable ? '☐' : '·'}
+			</Text>
+			<View style={{ flex: 1 }}>
+				<View style={{ flexDirection: 'row', gap: 8 }}>
+					<Text style={{ color: tint, flex: 1, fontWeight: '700' }}>
+						{item.author}
+					</Text>
+					<Text style={{ color: token('TEXT_MUTED'), fontSize: 12 }}>
+						{when(item.at)}
+					</Text>
+				</View>
+				<Text style={{ color: tint }}>{item.text}</Text>
+				{item.tooNew ? (
+					<Text style={{ color: token('TEXT_MUTED'), fontSize: 12 }}>
+						newer than the age limit, so it cannot be picked
+					</Text>
+				) : null}
+				{!item.mine ? (
+					<Text style={{ color: token('TEXT_MUTED'), fontSize: 12 }}>
+						not yours, so it cannot be deleted
+					</Text>
+				) : null}
+			</View>
+		</Pressable>
+	)
+}
 // ─── Settings page ───────────────────────────────────────────────────────────
 
 type RowProps = Record<string, unknown>
 type Row = (props: RowProps) => ReactNode
 type Group = (props: { title?: string; children?: unknown }) => ReactNode
-
 interface Ui {
 	TableRowGroup?: Group
 	TableRow?: Row
@@ -416,6 +607,11 @@ export default plugin<{ jsonStorage: Settings }>({
 		const running = useProgress()
 		const [list, setList] = useState<Conversation[] | null>(null)
 		const [error, setError] = useState('')
+		const [open, setOpen] = useState<Conversation | null>(null)
+		const [items, setItems] = useState<Item[]>([])
+		const [chosen, setChosen] = useState<string[]>([])
+		const [reading, setReading] = useState(false)
+		const [more, setMore] = useState(false)
 		const mounted = useRef(true)
 
 		const load = () => {
@@ -450,14 +646,242 @@ export default plugin<{ jsonStorage: Settings }>({
 			save({ delayMs: DELAY_CHOICES[(index + 1) % DELAY_CHOICES.length] })
 		}
 
-		const begin = (conversation: Conversation) => {
-			if (running.active || settings.enabled === false) return
-			confirmDelete(conversation.name, () => {
-				void clear(conversation, settings)
+		const cutoff = (): number =>
+			settings.olderThanDays > 0
+				? Date.now() - settings.olderThanDays * DAY
+				: 0
+
+		const readPage = async (conversation: Conversation, before: string) => {
+			setReading(true)
+			setError('')
+			try {
+				const me = currentUserId()
+				if (!me) throw new Error('could not read your account')
+				const raw = await fetchPage(conversation.id, before)
+				const next: Item[] = []
+				for (const one of raw) {
+					const item = toItem(one, me, cutoff())
+					if (item) next.push(item)
+				}
+				if (!mounted.current) return
+				setItems(current => {
+					if (!before) return next
+					const seen = new Set(current.map(item => item.id))
+					return [...current, ...next.filter(item => !seen.has(item.id))]
+				})
+				setMore(raw.length >= PAGE)
+			} catch (problem) {
+				if (mounted.current) setError(errorMessage(problem))
+			} finally {
+				if (mounted.current) setReading(false)
+			}
+		}
+
+		const browse = (conversation: Conversation) => {
+			setOpen(conversation)
+			setItems([])
+			setChosen([])
+			setMore(true)
+			void readPage(conversation, '')
+		}
+
+		const readOlder = () => {
+			if (!open || reading || !more || !items.length) return
+			void readPage(open, items[items.length - 1].id)
+		}
+
+		const toggle = (item: Item) => {
+			if (running.active) return
+			if (!item.mine) {
+				note('that message is not yours, so it cannot be deleted')
+				return
+			}
+			if (item.tooNew) {
+				note('that message is newer than ' + settings.olderThanDays + ' days')
+				return
+			}
+			setChosen(current =>
+				current.includes(item.id)
+					? current.filter(id => id !== item.id)
+					: [...current, item.id],
+			)
+		}
+
+		const selectMine = () => {
+			const eligible = items
+				.filter(item => item.mine && !item.tooNew)
+				.map(item => item.id)
+			const everything =
+				eligible.length > 0 && eligible.every(id => chosen.includes(id))
+			setChosen(everything ? [] : eligible)
+		}
+
+		const deleteChosen = () => {
+			if (!open || running.active || !chosen.length) return
+			const ids = [...chosen]
+			confirmDelete(
+				ids.length +
+					' message' +
+					(ids.length === 1 ? '' : 's') +
+					' you sent in ' +
+					open.name,
+				() => {
+					void remove(open, ids, settings, id => {
+						if (!mounted.current) return
+						setItems(current => current.filter(item => item.id !== id))
+						setChosen(current => current.filter(one => one !== id))
+					})
+				},
+			)
+		}
+
+		const deleteEverything = () => {
+			if (!open || running.active || settings.enabled === false) return
+			confirmDelete('every message you sent in ' + open.name, () => {
+				void clear(open, settings)
 			})
 		}
 
 		const D = (Design ?? {}) as unknown as Ui
+		const muted = token('TEXT_MUTED')
+		const danger = token('TEXT_DANGER')
+
+		// ── The open conversation ────────────────────────────────────────────
+		if (open) {
+			const eligible = items.filter(item => item.mine && !item.tooNew)
+			const every =
+				eligible.length > 0 &&
+				eligible.every(item => chosen.includes(item.id))
+			const close = () => {
+				if (running.active) return
+				setOpen(null)
+				setItems([])
+				setChosen([])
+				setError('')
+			}
+			return (
+				<ScrollView style={settingsScroll}>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel="Back to your DMs"
+						disabled={running.active}
+						onPress={close}
+						style={{ paddingVertical: 12 }}
+					>
+						<Text style={{ color: token('BRAND_500'), fontWeight: '700' }}>
+							‹ Your DMs
+						</Text>
+					</Pressable>
+
+					<Text
+						style={{
+							color: token('TEXT_NORMAL'),
+							fontSize: 18,
+							fontWeight: '700',
+						}}
+					>
+						Delete msgs
+					</Text>
+					<Text style={{ color: muted, marginTop: 2 }}>
+						{open.name} · {items.length} shown · {eligible.length} yours to
+						delete
+					</Text>
+
+					<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+						<Chip
+							label={every ? 'Clear selection' : 'Select all mine (' + eligible.length + ')'}
+							disabled={running.active || !eligible.length}
+							onPress={selectMine}
+						/>
+						<Chip
+							label={'Delete selected (' + chosen.length + ')'}
+							danger
+							disabled={running.active || !chosen.length}
+							onPress={deleteChosen}
+						/>
+						{running.active ? (
+							<Chip
+								label="Stop"
+								danger
+								onPress={() => {
+									stopping = true
+									note('stopping after this message')
+								}}
+							/>
+						) : null}
+					</View>
+
+					{running.note ? (
+						<Text style={{ color: muted, marginTop: 10 }}>
+							{running.deleted} deleted · {running.failed} refused ·{' '}
+							{running.note}
+						</Text>
+					) : null}
+					{error ? (
+						<Text style={{ color: danger, marginTop: 10 }}>{error}</Text>
+					) : null}
+
+					<View style={{ marginTop: 6 }}>
+						{items.map(item => (
+							<MessageRow
+								key={item.id}
+								item={item}
+								picked={chosen.includes(item.id)}
+								onPress={() => toggle(item)}
+							/>
+						))}
+					</View>
+
+					{reading && !items.length ? (
+						<Text style={{ color: muted, marginTop: 12 }}>
+							Reading the messages…
+						</Text>
+					) : null}
+					{!reading && !items.length && !error ? (
+						<Text style={{ color: muted, marginTop: 12 }}>
+							No messages here.
+						</Text>
+					) : null}
+
+					<View style={{ marginTop: 12 }}>
+						<Chip
+							label={
+								reading
+									? 'Reading…'
+									: more
+										? 'Load older messages'
+										: 'No older messages'
+							}
+							disabled={reading || !more}
+							onPress={readOlder}
+						/>
+					</View>
+
+					<View style={{ gap: 8, marginTop: 16, marginBottom: 24 }}>
+						<Text style={{ color: muted }}>
+							Tap a message of yours to pick it, then Delete selected.
+							{settings.olderThanDays > 0
+								? ' Anything from the last ' +
+									settings.olderThanDays +
+									' days stays out of reach.'
+								: ' Everything you sent is eligible.'}
+						</Text>
+						<Chip
+							label="Delete everything I sent"
+							danger
+							disabled={running.active || settings.enabled === false}
+							onPress={deleteEverything}
+						/>
+						<Text style={{ color: danger }}>
+							Deleting can never be undone, and it is always your own account
+							making the request.
+						</Text>
+					</View>
+				</ScrollView>
+			)
+		}
+
+		// ── Settings and the conversation list ───────────────────────────────
 		if (!D.TableRowGroup) {
 			return (
 				<ScrollView style={settingsScroll}>
@@ -468,39 +892,40 @@ export default plugin<{ jsonStorage: Settings }>({
 			)
 		}
 
-		const muted = token('TEXT_MUTED')
-		const danger = token('TEXT_DANGER')
 		const supported = resolveActions() !== null
+		const begin = (conversation: Conversation) => {
+			if (running.active) return
+			browse(conversation)
+		}
 
 		const rows = (list ?? []).map(entry =>
 			D.TableRow ? (
 				<Pressable
 					key={entry.id}
+					accessibilityLabel={'Delete msgs in ' + entry.name}
 					delayLongPress={450}
-					disabled={running.active || settings.enabled === false}
+					disabled={running.active}
 					onLongPress={() => begin(entry)}
-					accessibilityLabel={
-						'Hold to delete your messages in ' + entry.name
-					}
+					onPress={() => begin(entry)}
 				>
 					<D.TableRow
 						label={entry.name}
 						subLabel={
-							(entry.group ? 'Group DM · ' : '') +
-							'hold to delete the messages you sent'
+							(entry.group ? 'Group DM · ' : '') + 'hold to delete msgs'
 						}
+						onPress={() => begin(entry)}
 					/>
 				</Pressable>
 			) : (
 				<Pressable
 					key={entry.id}
+					accessibilityLabel={'Delete msgs in ' + entry.name}
 					style={{ paddingVertical: 10 }}
 					onLongPress={() => begin(entry)}
+					onPress={() => begin(entry)}
 				>
 					<Text style={{ color: token('TEXT_NORMAL') }}>{entry.name}</Text>
-					<Text style={{ color: muted }}>
-						hold to delete the messages you sent
-					</Text>
+					<Text style={{ color: muted }}>hold to delete msgs</Text>
 				</Pressable>
 			),
 		)
@@ -519,7 +944,7 @@ export default plugin<{ jsonStorage: Settings }>({
 					{D.TableSwitchRow ? (
 						<D.TableSwitchRow
 							label="Only messages older than 7 days"
-							subLabel="Anything newer is skipped, so a delete cannot be aimed at a live conversation."
+							subLabel="Anything newer is shown but cannot be picked, so a delete cannot be aimed at a live conversation."
 							value={settings.olderThanDays > 0}
 							onValueChange={(value: boolean) =>
 								save({ olderThanDays: value ? 7 : 0 })
@@ -607,7 +1032,8 @@ export default plugin<{ jsonStorage: Settings }>({
 
 				<View style={{ paddingBottom: 24 }}>
 					<Text style={{ color: muted }}>
-						Hold a conversation to delete the messages you sent there.
+						Hold a conversation to see its messages and delete the ones you
+						sent.
 						{settings.olderThanDays > 0
 							? ' Anything from the last ' +
 								settings.olderThanDays +
