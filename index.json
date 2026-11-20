@@ -1,128 +1,164 @@
 {
-    "format": 1,
-    "name": "Ceno Plugins",
-    "description": "Small Valenced plugins by cenotaph.",
-    "icon": "WrenchIcon",
-    "plugins": {
-        "dev.8uvu.clean-urls": {
-            "name": "Clean URLs",
-            "description": "Strips tracking parameters from links.",
-            "icon": "LinkIcon",
-            "author": "cenotaph",
-            "channels": {
-                "latest": "1.1.11"
+  "format": 1,
+  "name": "Ceno Plugins",
+  "description": "Small Valenced plugins by cenotaph.",
+  "plugins": {
+    "dev.8uvu.clean-urls": {
+      "name": "Clean URLs",
+      "description": "Strips tracking parameters from links.",
+      "author": "cenotaph",
+      "icon": "LinkIcon",
+      "channels": {
+        "latest": "1.1.11"
+      },
+      "versions": {
+        "1.1.11": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.clean-urls@1.1.11.zip",
+          "sha256": "c3617e41ab4a1e5c5e278ab66b96d8ac03500b65dea2d8743948bba55067e738",
+          "size": 4409,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
             },
-            "versions": {
-                "1.1.11": {
-                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.clean-urls@1.1.11.zip",
-                    "sha256": "c3617e41ab4a1e5c5e278ab66b96d8ac03500b65dea2d8743948bba55067e738",
-                    "size": 4409,
-                    "dependencies": {
-                        "valenced.api": {
-                            "version": ">=1 <2"
-                        },
-                        "discord": {
-                            "version": "*"
-                        }
-                    }
-                }
+            "discord": {
+              "version": "*"
             }
-        },
-        "dev.8uvu.dont-control-me": {
-            "name": "Don't Control Me",
-            "description": "Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission.",
-            "icon": "MicrophoneIcon",
-            "author": "cenotaph",
-            "channels": {
-                "latest": "1.1.8"
-            },
-            "versions": {
-                "1.1.8": {
-                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.1.8.zip",
-                    "sha256": "821dc8b174057cd3f0617c005f0f0c5a94e124abc2ddbc2db8fe8bc7d7163695",
-                    "size": 5245,
-                    "dependencies": {
-                        "valenced.api": {
-                            "version": ">=1 <2"
-                        },
-                        "discord": {
-                            "version": "*"
-                        }
-                    }
-                }
-            }
-        },
-        "dev.8uvu.fake-dm": {
-            "name": "FakeDM",
-            "description": "Fake messages and calls in the chat you have open. Drawn locally, never sent.",
-            "icon": "MessageIcon",
-            "author": "cenotaph",
-            "channels": {
-                "latest": "6.0.9"
-            },
-            "versions": {
-                "6.0.9": {
-                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.fake-dm@6.0.9.zip",
-                    "sha256": "e3783f35b11f6a0bb22c34221bb5ac64ef6694fa485fb28b4959ef79d339214f",
-                    "size": 25403,
-                    "dependencies": {
-                        "valenced.api": {
-                            "version": ">=1 <2"
-                        },
-                        "discord": {
-                            "version": "*"
-                        }
-                    }
-                }
-            }
-        },
-        "dev.8uvu.streaks": {
-            "name": "Streaks",
-            "description": "Counts how many days in a row you and someone messaged each other. Stored on this device only.",
-            "icon": "MessageIcon",
-            "author": "cenotaph",
-            "channels": {
-                "latest": "1.0.0"
-            },
-            "versions": {
-                "1.0.0": {
-                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.streaks@1.0.0.zip",
-                    "sha256": "3fb58a159722d021eca23e30f5f09249f3894eaab038dbb40bb04dd775f3b641",
-                    "size": 5223,
-                    "dependencies": {
-                        "valenced.api": {
-                            "version": ">=1 <2"
-                        },
-                        "discord": {
-                            "version": "*"
-                        }
-                    }
-                }
-            }
-        },
-        "dev.8uvu.typing-watch": {
-            "name": "TypingWatch",
-            "description": "Remembers who started typing, in case the indicator vanished before you looked.",
-            "icon": "EyeIcon",
-            "author": "cenotaph",
-            "channels": {
-                "latest": "1.0.12"
-            },
-            "versions": {
-                "1.0.12": {
-                    "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.0.12.zip",
-                    "sha256": "b1025fc2e238e0a163da760b338ffaf85783c7aebf67dc84d000c4ddd7a3c0f8",
-                    "size": 3880,
-                    "dependencies": {
-                        "valenced.api": {
-                            "version": ">=1 <2"
-                        },
-                        "discord": {
-                            "version": "*"
-                        }
-                    }
-                }
-            }
+          }
         }
+      }
+    },
+    "dev.8uvu.dm-deleter": {
+      "name": "DM Deleter",
+      "description": "Deletes your own messages in a DM, one at a time with uneven pauses, and waits out rate limits so a big cleanup does not get your account flagged.",
+      "author": "cenotaph",
+      "icon": "TrashIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@1.0.0.zip",
+          "sha256": "345d6d393001739668cea43108546aeac0c1c63ec827003544530b8017bf0972",
+          "size": 4229,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.dont-control-me": {
+      "name": "Don't Control Me",
+      "description": "Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission.",
+      "author": "cenotaph",
+      "icon": "MicrophoneIcon",
+      "channels": {
+        "latest": "1.1.8"
+      },
+      "versions": {
+        "1.1.8": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.1.8.zip",
+          "sha256": "821dc8b174057cd3f0617c005f0f0c5a94e124abc2ddbc2db8fe8bc7d7163695",
+          "size": 5245,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.fake-dm": {
+      "name": "FakeDM",
+      "description": "Fake messages and calls in the chat you have open. Drawn locally, never sent.",
+      "author": "cenotaph",
+      "icon": "MessageIcon",
+      "channels": {
+        "latest": "6.0.9"
+      },
+      "versions": {
+        "6.0.9": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.fake-dm@6.0.9.zip",
+          "sha256": "e3783f35b11f6a0bb22c34221bb5ac64ef6694fa485fb28b4959ef79d339214f",
+          "size": 25403,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.streaks": {
+      "name": "Streaks",
+      "description": "Counts how many days in a row you have talked to someone, and shows the streak next to their name in the chat. Stored on this device only.",
+      "author": "cenotaph",
+      "icon": "MessageIcon",
+      "channels": {
+        "latest": "1.1.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.streaks@1.0.0.zip",
+          "sha256": "3fb58a159722d021eca23e30f5f09249f3894eaab038dbb40bb04dd775f3b641",
+          "size": 5223,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.streaks@1.1.0.zip",
+          "sha256": "52d1707fa478e2dce6e78096b2082a34b4d78bb3992e33c80c56b545e80b9eca",
+          "size": 3936,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.typing-watch": {
+      "name": "TypingWatch",
+      "description": "Remembers who started typing, in case the indicator vanished before you looked.",
+      "author": "cenotaph",
+      "icon": "EyeIcon",
+      "channels": {
+        "latest": "1.0.12"
+      },
+      "versions": {
+        "1.0.12": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.0.12.zip",
+          "sha256": "b1025fc2e238e0a163da760b338ffaf85783c7aebf67dc84d000c4ddd7a3c0f8",
+          "size": 3880,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
     }
+  }
 }
