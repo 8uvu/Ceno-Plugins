@@ -9,7 +9,7 @@
 // When that module is not reachable (a unit-test harness, or a build that
 // renamed it) the lookup returns undefined and the platform's default colour
 // applies, which is always legible.
-import { Tokens } from '@valenced/discord/common'
+import { Tokens } from '@valenced/discord/common/tokens'
 import { Appearance } from 'react-native'
 
 type Appearance2 = 'dark' | 'light'
