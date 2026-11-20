@@ -10,7 +10,8 @@ https://8uvu.github.io/Ceno-Plugins/index.json
 ```
 
 Add it in Settings → Valenced → Plugins → Advanced → Repository URL, then install
-from the list. Updates come through the same repository.
+from the list.
+Updates come through the same repository.
 
 ## Plugins
 
@@ -21,13 +22,12 @@ from the list. Updates come through the same repository.
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
 | **Streaks** | Counts how many days in a row you have talked to someone and shows the count next to their name. Stays on this device. | 1.1.0 |
-| **DM Deleter** | Hold a DM in the plugin's settings to delete the messages you sent there, at 2.5 s a message with an uneven pause, waiting out rate limits. Optionally leaves anything from the last 7 days alone. | 1.0.0 |
+| **DM Deleter** | Hold a DM to see its messages and delete the ones you sent, at 2.5 s a message with an uneven pause, waiting out rate limits. Optionally leaves anything from the last 7 days alone. | 1.1.0 |
 
 ## Layout
 
 Each folder under `plugins/` is one plugin, named after the plugin; the `id` the
 catalog keys on is in its manifest.
-
 ```
 plugins/
 ├── fake-dm/                     # JS-only: no src/main, no dist.android
@@ -60,7 +60,6 @@ bun run generate-index   # writes index.json from the published pool
 bun run lint             # biome
 bun run lint:types       # tsc -b plugins/*/tsconfig.json
 ```
-
 The published catalog lives on the `gh-pages` branch (`index.json`, `pool/*.zip`
 and one folder per plugin) and is what the URL above serves. It was built from
 these sources with the repository's own bundler and is committed there so the
