@@ -1,0 +1,20 @@
+{
+    "format": 1,
+    "id": "dev.8uvu.dm-deleter",
+    "name": "DM Deleter",
+    "description": "Deletes your own messages in a DM, one at a time with uneven pauses, and waits out rate limits so a big cleanup does not get your account flagged.",
+    "author": "cenotaph",
+    "icon": "TrashIcon",
+    "version": "1.0.0",
+    "dependencies": {
+        "valenced.api": {
+            "version": ">=1 <2"
+        },
+        "discord": {
+            "version": "*"
+        }
+    },
+    "dist": {
+        "script": "index.js"
+    }
+}
