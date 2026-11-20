@@ -2,10 +2,10 @@
     "format": 1,
     "id": "dev.8uvu.dm-deleter",
     "name": "DM Deleter",
-    "description": "Deletes your own messages in a DM, one at a time with uneven pauses, and waits out rate limits so a big cleanup does not get your account flagged.",
+    "description": "Hold a DM to see its messages, pick the ones you sent, and delete them one at a time with uneven pauses, waiting out rate limits so a cleanup does not get your account flagged.",
     "author": "cenotaph",
     "icon": "TrashIcon",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "dependencies": {
         "valenced.api": {
             "version": ">=1 <2"
