@@ -1,0 +1,39 @@
+# One-off repair, kept out of the normal pipeline.
+#
+# fake-dm imports the legacy `@valenced/modules/metro/subscriptions` alias,
+# which @valenced/types no longer maps, so `packageAllPlugins` fails. This
+# rewrites the specifier to the mapped path, commits it, and removes itself in
+# the same commit.
+
+name: Fix fake-dm metro import
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rewrite the legacy specifier
+        run: |
+          file=plugins/fake-dm/js/index.tsx
+          sed -i "s|'@valenced/modules/metro/subscriptions'|'@valenced/discord/utils/modules/metro/subscriptions'|g" "$file"
+          if grep -q "'@valenced/modules/metro/subscriptions'" "$file"; then
+            echo "old specifier still present" >&2
+            exit 1
+          fi
+          grep -n "metro/subscriptions" "$file"
+
+      - name: Commit and remove this workflow
+        run: |
+          git config user.name cenotaph
+          git config user.email ana911aaa@gmail.com
+          git rm -q .github/workflows/fix-metro-import.yml
+          git add plugins/fake-dm/js/index.tsx
+          git commit -m "fake-dm: import metro subscriptions from the mapped path"
+          git push
