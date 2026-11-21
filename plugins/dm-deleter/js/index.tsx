@@ -9,7 +9,7 @@
 // the login token never leaves the client and the client's own request queue
 // still sees every call.
 import { Design } from '@valenced/discord/design'
-import { Stores, getStore } from '@valenced/discord/flux'
+import { getStore, Stores } from '@valenced/discord/flux'
 import { lookupModule } from '@valenced/modules/finders'
 import { withProps } from '@valenced/modules/finders/filters'
 import { useEffect, useRef, useState } from 'react'
@@ -17,7 +17,6 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native'
 import { settingsScroll, token } from '../../_shared/theme'
 import { asRecord, errorMessage } from '../../_shared/types'
 import type { JsonStorage, Logger, StoreLike } from '../../_shared/types'
-import type { ReactNode } from 'react'
 
 interface Settings {
 	enabled: boolean
@@ -93,8 +92,16 @@ function summary(headline: string): string {
 	)
 }
 
+// The ambient React declarations in types/ have no type parameter on `useState`,
+// so `useState<T>` is a type error there. This one wrapper keeps the page's state
+// typed and every setter checked, without a cast at each call site.
+type Setter<T> = (next: T | ((previous: T) => T)) => void
+function useValue<T>(initial: T): [T, Setter<T>] {
+	return useState(initial) as [T, Setter<T>]
+}
+
 function useProgress(): Progress {
-	const [, bump] = useState(0)
+	const [, bump] = useValue(0)
 	useEffect(() => {
 		let alive = true
 		const listener = () => {
@@ -139,7 +146,11 @@ interface ChannelStoreLike extends StoreLike {
 }
 
 interface MessageActionsLike {
-	deleteMessage(channelId: string, messageId: string, ...rest: unknown[]): unknown
+	deleteMessage(
+		channelId: string,
+		messageId: string,
+		...rest: unknown[]
+	): unknown
 	fetchMessages?: (...args: unknown[]) => unknown
 }
 
@@ -205,7 +216,7 @@ function conversationName(channel: Record<string, unknown>): string {
 	if (names.length) return names.join(', ')
 	const fallback = channel.name
 	if (typeof fallback === 'string' && fallback) return fallback
-	return 'DM ' + String(channel.id ?? '').slice(-4)
+	return `DM ${String(channel.id ?? '').slice(-4)}`
 }
 interface Conversation {
 	id: string
@@ -288,8 +299,8 @@ function toItem(raw: unknown, me: string, cutoff: number): Item | null {
 	const embeds = Array.isArray(message.embeds) ? message.embeds.length : 0
 	let text = typeof message.content === 'string' ? message.content.trim() : ''
 	if (!text && files)
-		text = files === 1 ? '1 attachment' : files + ' attachments'
-	if (!text && embeds) text = embeds === 1 ? '1 embed' : embeds + ' embeds'
+		text = files === 1 ? '1 attachment' : `${files} attachments`
+	if (!text && embeds) text = embeds === 1 ? '1 embed' : `${embeds} embeds`
 	if (!text) text = '(no text)'
 	const mine = authorId === me
 	const time = Number.isFinite(at) ? at : 0
@@ -359,20 +370,27 @@ async function erase(
 				log?.warn?.('[DM Deleter] delete refused', error)
 				return 'refused'
 			}
-			note('rate limited, waiting ' + Math.ceil(wait / 1000) + ' s')
+			note(`rate limited, waiting ${Math.ceil(wait / 1000)} s`)
 			await sleep(wait)
 		}
 	}
 	return 'refused'
 }
 
-async function fetchPage(channelId: string, before: string): Promise<unknown[]> {
+async function fetchPage(
+	channelId: string,
+	before: string,
+): Promise<unknown[]> {
 	const fetcher = resolveHistory()
 	if (!fetcher)
 		throw new Error('this build does not give plugins message history')
 	let result: unknown
 	try {
-		result = await fetcher({ channelId, limit: PAGE, before: before || undefined })
+		result = await fetcher({
+			channelId,
+			limit: PAGE,
+			before: before || undefined,
+		})
 	} catch {
 		// Some builds take the arguments in order instead of an object.
 		result = await fetcher(channelId, before || undefined, PAGE)
@@ -398,10 +416,11 @@ async function remove(
 		...IDLE,
 		active: true,
 		channel: conversation.name,
-		note: 'deleting ' + ids.length + ' message(s)',
+		note: `deleting ${ids.length} message(s)`,
 	})
 	try {
-		if (!resolveActions()) throw new Error('this build does not expose message actions')
+		if (!resolveActions())
+			throw new Error('this build does not expose message actions')
 		for (let index = 0; index < ids.length; index++) {
 			if (stopping) break
 			const outcome = await erase(conversation.id, ids[index])
@@ -413,14 +432,14 @@ async function remove(
 			}
 			if (index === ids.length - 1 || stopping) continue
 			const pause = pauseFor(settings)
-			note('waiting ' + (pause / 1000).toFixed(1) + ' s')
+			note(`waiting ${(pause / 1000).toFixed(1)} s`)
 			await sleep(pause)
 		}
 		publish({ active: false, note: summary(stopping ? 'stopped' : 'finished') })
-		log?.log?.('[DM Deleter] ' + conversation.name + ': ' + progress.note)
+		log?.log?.(`[DM Deleter] ${conversation.name}: ${progress.note}`)
 	} catch (error) {
-		publish({ active: false, note: 'stopped: ' + errorMessage(error) })
-		log?.warn?.('[DM Deleter] ' + errorMessage(error))
+		publish({ active: false, note: `stopped: ${errorMessage(error)}` })
+		log?.warn?.(`[DM Deleter] ${errorMessage(error)}`)
 	}
 }
 
@@ -438,9 +457,7 @@ async function clear(
 		note: 'reading the conversation',
 	})
 	const cutoff =
-		settings.olderThanDays > 0
-			? Date.now() - settings.olderThanDays * DAY
-			: 0
+		settings.olderThanDays > 0 ? Date.now() - settings.olderThanDays * DAY : 0
 	try {
 		const me = currentUserId()
 		if (!me) throw new Error('could not read your account')
@@ -468,7 +485,7 @@ async function clear(
 					publish({ deleted: progress.deleted + 1 })
 				else publish({ failed: progress.failed + 1 })
 				const pause = pauseFor(settings)
-				note('waiting ' + (pause / 1000).toFixed(1) + ' s')
+				note(`waiting ${(pause / 1000).toFixed(1)} s`)
 				await sleep(pause)
 			}
 			if (stopping || !oldest || oldest === before) break
@@ -476,10 +493,10 @@ async function clear(
 			if (messages.length < PAGE) break
 		}
 		publish({ active: false, note: summary(stopping ? 'stopped' : 'finished') })
-		log?.log?.('[DM Deleter] ' + conversation.name + ': ' + progress.note)
+		log?.log?.(`[DM Deleter] ${conversation.name}: ${progress.note}`)
 	} catch (error) {
-		publish({ active: false, note: 'stopped: ' + errorMessage(error) })
-		log?.warn?.('[DM Deleter] ' + errorMessage(error))
+		publish({ active: false, note: `stopped: ${errorMessage(error)}` })
+		log?.warn?.(`[DM Deleter] ${errorMessage(error)}`)
 	}
 }
 
@@ -506,7 +523,7 @@ function Chip(props: {
 	onPress?: () => void
 	danger?: boolean
 	disabled?: boolean
-}): ReactNode {
+}) {
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -523,7 +540,8 @@ function Chip(props: {
 		>
 			<Text
 				style={{
-					color: props.danger === true ? token('TEXT_DANGER') : token('TEXT_NORMAL'),
+					color:
+						props.danger === true ? token('TEXT_DANGER') : token('TEXT_NORMAL'),
 					fontWeight: '600',
 				}}
 			>
@@ -539,14 +557,17 @@ function MessageRow(props: {
 	item: Item
 	picked: boolean
 	onPress: () => void
-}): ReactNode {
+	// The ambient JSX types carry no IntrinsicAttributes, so `key` has to be
+	// declared here for the message list below to compile.
+	key?: string
+}) {
 	const { item, picked } = props
 	const pickable = item.mine && !item.tooNew
 	const tint = pickable ? token('TEXT_NORMAL') : token('TEXT_MUTED')
 	return (
 		<Pressable
 			accessibilityRole="button"
-			accessibilityLabel={item.author + ': ' + item.text}
+			accessibilityLabel={`${item.author}: ${item.text}`}
 			onPress={props.onPress}
 			style={{ flexDirection: 'row', gap: 10, paddingVertical: 9 }}
 		>
@@ -585,8 +606,8 @@ function MessageRow(props: {
 // ─── Settings page ───────────────────────────────────────────────────────────
 
 type RowProps = Record<string, unknown>
-type Row = (props: RowProps) => ReactNode
-type Group = (props: { title?: string; children?: unknown }) => ReactNode
+type Row = (props: RowProps) => unknown
+type Group = (props: { title?: string; children?: unknown }) => unknown
 interface Ui {
 	TableRowGroup?: Group
 	TableRow?: Row
@@ -605,13 +626,13 @@ export default plugin<{ jsonStorage: Settings }>({
 	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
 		const settings = api.jsonStorage.use() ?? DEFAULTS
 		const running = useProgress()
-		const [list, setList] = useState<Conversation[] | null>(null)
-		const [error, setError] = useState('')
-		const [open, setOpen] = useState<Conversation | null>(null)
-		const [items, setItems] = useState<Item[]>([])
-		const [chosen, setChosen] = useState<string[]>([])
-		const [reading, setReading] = useState(false)
-		const [more, setMore] = useState(false)
+		const [list, setList] = useValue<Conversation[] | null>(null)
+		const [error, setError] = useValue('')
+		const [open, setOpen] = useValue<Conversation | null>(null)
+		const [items, setItems] = useValue<Item[]>([])
+		const [chosen, setChosen] = useValue<string[]>([])
+		const [reading, setReading] = useValue(false)
+		const [more, setMore] = useValue(false)
 		const mounted = useRef(true)
 
 		const load = () => {
@@ -647,9 +668,7 @@ export default plugin<{ jsonStorage: Settings }>({
 		}
 
 		const cutoff = (): number =>
-			settings.olderThanDays > 0
-				? Date.now() - settings.olderThanDays * DAY
-				: 0
+			settings.olderThanDays > 0 ? Date.now() - settings.olderThanDays * DAY : 0
 
 		const readPage = async (conversation: Conversation, before: string) => {
 			setReading(true)
@@ -697,7 +716,7 @@ export default plugin<{ jsonStorage: Settings }>({
 				return
 			}
 			if (item.tooNew) {
-				note('that message is newer than ' + settings.olderThanDays + ' days')
+				note(`that message is newer than ${settings.olderThanDays} days`)
 				return
 			}
 			setChosen(current =>
@@ -737,7 +756,7 @@ export default plugin<{ jsonStorage: Settings }>({
 
 		const deleteEverything = () => {
 			if (!open || running.active || settings.enabled === false) return
-			confirmDelete('every message you sent in ' + open.name, () => {
+			confirmDelete(`every message you sent in ${open.name}`, () => {
 				void clear(open, settings)
 			})
 		}
@@ -750,8 +769,7 @@ export default plugin<{ jsonStorage: Settings }>({
 		if (open) {
 			const eligible = items.filter(item => item.mine && !item.tooNew)
 			const every =
-				eligible.length > 0 &&
-				eligible.every(item => chosen.includes(item.id))
+				eligible.length > 0 && eligible.every(item => chosen.includes(item.id))
 			const close = () => {
 				if (running.active) return
 				setOpen(null)
@@ -787,14 +805,25 @@ export default plugin<{ jsonStorage: Settings }>({
 						delete
 					</Text>
 
-					<View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+					<View
+						style={{
+							flexDirection: 'row',
+							flexWrap: 'wrap',
+							gap: 8,
+							marginTop: 12,
+						}}
+					>
 						<Chip
-							label={every ? 'Clear selection' : 'Select all mine (' + eligible.length + ')'}
+							label={
+								every
+									? 'Clear selection'
+									: `Select all mine (${eligible.length})`
+							}
 							disabled={running.active || !eligible.length}
 							onPress={selectMine}
 						/>
 						<Chip
-							label={'Delete selected (' + chosen.length + ')'}
+							label={`Delete selected (${chosen.length})`}
 							danger
 							disabled={running.active || !chosen.length}
 							onPress={deleteChosen}
@@ -902,7 +931,7 @@ export default plugin<{ jsonStorage: Settings }>({
 			D.TableRow ? (
 				<Pressable
 					key={entry.id}
-					accessibilityLabel={'Delete msgs in ' + entry.name}
+					accessibilityLabel={`Delete msgs in ${entry.name}`}
 					delayLongPress={450}
 					disabled={running.active}
 					onLongPress={() => begin(entry)}
@@ -910,16 +939,14 @@ export default plugin<{ jsonStorage: Settings }>({
 				>
 					<D.TableRow
 						label={entry.name}
-						subLabel={
-							(entry.group ? 'Group DM · ' : '') + 'hold to delete msgs'
-						}
+						subLabel={`${entry.group ? 'Group DM · ' : ''}hold to delete msgs`}
 						onPress={() => begin(entry)}
 					/>
 				</Pressable>
 			) : (
 				<Pressable
 					key={entry.id}
-					accessibilityLabel={'Delete msgs in ' + entry.name}
+					accessibilityLabel={`Delete msgs in ${entry.name}`}
 					style={{ paddingVertical: 10 }}
 					onLongPress={() => begin(entry)}
 					onPress={() => begin(entry)}
@@ -961,9 +988,7 @@ export default plugin<{ jsonStorage: Settings }>({
 					) : null}
 					{D.TableRow ? (
 						<D.TableRow
-							label={
-								'Pause between deletes: ' + (delay / 1000).toFixed(1) + ' s'
-							}
+							label={`Pause between deletes: ${(delay / 1000).toFixed(1)} s`}
 							subLabel="Tap to change. 2.5 s is a safe pace."
 							onPress={nextDelay}
 						/>
@@ -980,9 +1005,7 @@ export default plugin<{ jsonStorage: Settings }>({
 				{running.active || running.note ? (
 					<D.TableRowGroup
 						title={
-							running.active
-								? 'Deleting in ' + running.channel
-								: 'Last run'
+							running.active ? `Deleting in ${running.channel}` : 'Last run'
 						}
 					>
 						{D.TableRow ? (
