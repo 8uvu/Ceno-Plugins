@@ -24,6 +24,9 @@ in the background.
 | **Message Logger** | Keeps the edits and deletions this device saw, with the text before and after. | 1.0.0 |
 | **Watchlist** | Get a toast when someone you watch comes online, types to you, or sends a message. | 1.0.0 |
 | **Later** | Hold a message and be pinged about it in an hour, in three hours, or tomorrow. | 1.0.0 |
+| **Bookmarks** | Keep a message on this device: the text, its author, the channel and the time. | 1.0.0 |
+| **Keywords** | Get a toast when a message contains a word you follow. | 1.0.0 |
+| **Last Seen** | A local record of when people came online and went away. | 1.0.0 |
 | **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.1.0 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
@@ -110,6 +113,58 @@ tomorrow — useful for the message you cannot deal with right now.
 
 **Settings page:** the switch, the waiting pings in order, and the row that
 cancels every one.
+
+## Bookmarks
+
+Hold a message and keep it. The text, who wrote it, the channel and the time stay
+on this device — useful for the link you will want later and the thing you cannot
+act on now.
+
+- **Save and unsave from the message menu.** Hold any message and pick *Save this
+  message*; the same row becomes *Remove this bookmark* afterwards.
+- **Kept as it was.** An edit or a deletion afterwards does not change what you
+  kept, because the text is copied when you save it.
+- **Attachments are named, never downloaded.** A bookmark of a picture says so; it
+  does not copy the file.
+- **500 bookmarks,** newest first, each with how long ago it was saved.
+- **Removing one asks first,** with the system dialog, so a tap while scrolling
+  cannot lose it. *Remove every bookmark* is one row.
+- **Nothing is uploaded.** No account, no server, no token.
+
+**Settings page:** the switch, the count, the clear-all row, what is kept, and the
+list — tap one to remove it.
+
+## Keywords
+
+A watch on words rather than on people: when a message contains one, a toast says
+which word, where, and who wrote it.
+
+- **Whole words, any case.** `cat` does not fire on `concatenate`.
+- **One toast per word per channel a minute,** so a busy conversation cannot turn
+  into a toast storm.
+- **The toast quotes the message,** so you can tell at a glance whether it matters.
+- **Your own messages never fire,** and neither does a word you did not add.
+- **Up to 50 words,** separated by commas or new lines and edited on the page.
+- **The list stays here.** No account, no server, no token.
+
+**Settings page:** the switch, the word field, how many words are being watched, and
+the row that clears the list.
+
+## Last Seen
+
+Records when people came online and when they went away, so *were they around?* has
+an answer after the fact.
+
+- **Only real changes.** Discord repeats presence constantly as activities change;
+  a repeat is not coming or going and is not written.
+- **Online now first, then last seen,** most recent first, with how long each has
+  been online or how long ago they left.
+- **It starts when the plugin starts.** Time before that is not known, and the page
+  says so instead of guessing.
+- **200 people,** the latest change kept per person.
+- **Forget everyone** is one row.
+
+**Settings page:** the switch, the forget-all row, how it knows, and the two lists.
 
 ## TypingWatch
 
@@ -230,6 +285,9 @@ plugins/
 ├── message-logger/
 ├── watchlist/
 ├── later/
+├── bookmarks/
+├── keywords/
+├── last-seen/
 └── _shared/                     # theme tokens and the shared menu patch
 scripts/                         # the verifier harness and its runner
 themes/                          # theme plugins, built and packaged like plugins/

@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.keywords",
+	"name": "Keywords",
+	"description": "Get a toast when a message contains a word you follow: whole words, one per channel a minute, your own messages ignored. The list stays on this device.",
+	"author": "cenotaph",
+	"icon": "BellIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}
