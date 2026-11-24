@@ -29,11 +29,11 @@
     },
     "dev.8uvu.dm-deleter": {
       "name": "Message Deleter",
-      "description": "Search your own messages in a DM the way Discrub does, tick what should go, and delete them one request at a time. Every delete asks first and respects Discord's limits.",
+      "description": "Hold a message and delete what you sent in that chat: one message, or every message of yours in the conversation, one request at a time. Asks first and obeys Discord's limits.",
       "author": "cenotaph",
       "icon": "TrashIcon",
       "channels": {
-        "latest": "2.2.0"
+        "latest": "3.0.0"
       },
       "versions": {
         "1.0.0": {
@@ -144,6 +144,19 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.2.0.zip",
           "sha256": "e277211720dcf0d79f97a61caabdc7f7ad90e7a98f0c9aa7e06bd580481f63a1",
           "size": 7546,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "3.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@3.0.0.zip",
+          "sha256": "0096880f354592bc2277e397a79b0a1ea9e7bda0263801501857629cfa83ad82",
+          "size": 5605,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
