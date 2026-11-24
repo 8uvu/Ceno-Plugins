@@ -22,7 +22,7 @@ Updates come through the same repository.
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
 | **Streaks** | Counts how many days in a row you have talked to someone and shows the count next to their name. Stays on this device. | 1.1.0 |
-| **Message Deleter** | Deletes your own messages in a DM: hold one message, or open the chat's list and pick several. Asks first, one request at a time. | 2.1.1 |
+| **Message Deleter** | Deletes your own messages in a DM: hold one message, or open the chat's list and pick several. Asks first, one request at a time. | 2.1.2 |
 
 ## Layout
 

@@ -840,6 +840,46 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 	)
 }
 
+// Discord's sheet action takes the component to show, and its own builds have
+// taken it two ways: a promise of the module, or a function that returns one.
+// This is both, so the list opens on either without guessing the build first.
+const SHEET_KEY = 'message-deleter-list'
+
+interface LazySheetModule {
+	default: () => unknown
+}
+
+// Returns why the sheet did not open, or an empty string when it did. Discord's
+// action has taken the component three ways across builds, so each is tried in
+// turn: the promise of the module (what the docs describe), a function that
+// returns it, and the key first. Whichever the build wants, it is the first one
+// that does not throw.
+function openSheet(Sheet: () => unknown): string {
+	const creators = ActionSheetActionCreators as unknown as {
+		openLazy?: unknown
+	}
+	const open = creators?.openLazy
+	if (typeof open !== 'function') return 'this build cannot open a sheet'
+	const call = open as (first: unknown, second: unknown) => void
+	const load = (): Promise<LazySheetModule> =>
+		Promise.resolve({ default: Sheet })
+	const attempts: Array<() => void> = [
+		() => call(load(), SHEET_KEY),
+		() => call(load, SHEET_KEY),
+		() => call(SHEET_KEY, load),
+	]
+	let first: unknown
+	for (const attempt of attempts) {
+		try {
+			attempt()
+			return ''
+		} catch (error) {
+			if (first === undefined) first = error
+		}
+	}
+	return errorMessage(first) || 'the sheet action refused'
+}
+
 function openBulkSheet(channel: ChannelLike, anchor: MessageLike): void {
 	if (!channel || typeof channel.id !== 'string') return
 	sheetState = { channel, anchor }
@@ -859,22 +899,20 @@ function openBulkSheet(channel: ChannelLike, anchor: MessageLike): void {
 			return
 		}
 		try {
-			const creators = ActionSheetActionCreators as unknown as {
-				openLazy?: (module: Promise<unknown>, key: string) => void
-			}
-			if (typeof creators.openLazy !== 'function') {
-				notify('This build cannot open the message list.', 'critical')
-				return
-			}
 			const Sheet = (): unknown => <BulkSheet design={design} />
-			creators.openLazy(
-				Promise.resolve({ default: Sheet }),
-				'message-deleter-list',
-			)
+			const problem = openSheet(Sheet)
+			if (problem) {
+				diagnostics.note = `the message list could not open: ${problem}`
+				logger?.warn?.('[Message Deleter] list failed', problem)
+				notify(`The message list could not open: ${problem}`, 'critical')
+			}
 		} catch (error) {
 			diagnostics.note = `the message list could not open: ${errorMessage(error)}`
 			logger?.warn?.('[Message Deleter] list failed', error)
-			notify('The message list could not open.', 'critical')
+			notify(
+				`The message list could not open: ${errorMessage(error)}`,
+				'critical',
+			)
 		}
 	}, CONFIRM_DELAY_MS)
 	timers.add(timer)
