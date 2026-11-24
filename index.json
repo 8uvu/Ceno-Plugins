@@ -29,11 +29,11 @@
     },
     "dev.8uvu.dm-deleter": {
       "name": "Message Deleter",
-      "description": "Hold a message you sent in a DM and delete that one message, after a confirmation with a preview. Nothing else is touched.",
+      "description": "Delete your own messages in a DM: hold one message, or open the chat's list and pick several. Every delete asks first and respects Discord's limits.",
       "author": "cenotaph",
       "icon": "TrashIcon",
       "channels": {
-        "latest": "2.0.0"
+        "latest": "2.1.0"
       },
       "versions": {
         "1.0.0": {
@@ -79,6 +79,19 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.0.0.zip",
           "sha256": "a22abf63358fc7ce412466bba633f2f573e85b704552043a07b3cb3f1d1e69ee",
           "size": 3570,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "2.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.1.0.zip",
+          "sha256": "37119cf3e50c6ecd09e74dff91378474a05d9c74aaddba31452351bbc712c6a2",
+          "size": 5977,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
