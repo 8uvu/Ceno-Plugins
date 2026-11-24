@@ -192,6 +192,54 @@
         }
       }
     },
+    "dev.8uvu.later": {
+      "name": "Later",
+      "description": "Hold a message and be pinged about it in an hour, in three hours, or tomorrow. Local only.",
+      "author": "cenotaph",
+      "icon": "ClockIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.later@1.0.0.zip",
+          "sha256": "53e197cb38d9496fe248e473b150494072a83d78caefd2de0fe1cc79b1764005",
+          "size": 3775,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.message-logger": {
+      "name": "Message Logger",
+      "description": "Keeps the edits and deletions this device saw, with the text before and after. Local only.",
+      "author": "cenotaph",
+      "icon": "ListBulletsIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.message-logger@1.0.0.zip",
+          "sha256": "e732044c7b06ac614d73e9a16dfd8d9f426500512287cba2254b8612bec9a0b7",
+          "size": 3118,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "dev.8uvu.streaks": {
       "name": "Streaks",
       "description": "Counts how many days in a row you have talked to someone, and shows the streak next to their name in the chat. Stored on this device only.",
@@ -255,6 +303,30 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.1.0.zip",
           "sha256": "edc0c526d0fb91896f8803e5965332a3c2aefa3fc279eed8aa99c8acaca289a6",
           "size": 2262,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.watchlist": {
+      "name": "Watchlist",
+      "description": "Get a toast when someone you are watching comes online, starts typing to you, or sends you a message. Stays on this device.",
+      "author": "cenotaph",
+      "icon": "EyeIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.watchlist@1.0.0.zip",
+          "sha256": "ca0ee936effc9e8faf83aa54b53fb0678f40e844b12f46da7cb1b0e4580e31a8",
+          "size": 3565,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
