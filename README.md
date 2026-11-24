@@ -17,6 +17,7 @@ Updates come through the same repository.
 
 | Plugin | What it does | Version |
 | --- | --- | --- |
+| **FakeDM** | Fake messages and calls in the chat you have open. Drawn locally, never sent. | 6.0.9 |
 | **TypingWatch** | Remembers who started typing, in case the indicator disappeared before you looked. | 1.0.12 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
@@ -29,10 +30,11 @@ Each folder under `plugins/` is one plugin, named after the plugin; the `id` the
 catalog keys on is in its manifest.
 ```
 plugins/
-├── typing-watch/
-│   ├── manifest.json            # id (dev.8uvu.typing-watch), metadata, dist.script
+├── fake-dm/                     # JS-only: no src/main, no dist.android
+│   ├── manifest.json            # id (dev.8uvu.fake-dm), metadata, dist.script
 │   ├── tsconfig.json            # the plugin's own type-check project
 │   └── js/index.tsx             # -> index.js
+├── typing-watch/
 ├── clean-urls/
 ├── dont-control-me/
 ├── streaks/

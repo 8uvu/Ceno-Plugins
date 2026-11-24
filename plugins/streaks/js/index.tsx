@@ -239,7 +239,9 @@ function describe(entry: Ranked): string {
 // patched and the count is inserted into its children. Every lookup and every
 // render is wrapped: a build that moved the component must lose the badge, not
 // the chat screen.
-let live: JsonStorage<Settings> | null = null
+// The framework's storage hands back its own loose cache type, so only the
+// presence of a cache is relied on here; the cast to Settings happens on read.
+let live: { cache?: unknown } | null = null
 const patched = new Set<unknown>()
 
 interface ModuleFinders {
@@ -252,7 +254,7 @@ interface ModuleFinders {
 
 function currentSettings(): Settings {
 	try {
-		return live?.cache ?? DEFAULTS
+		return (live?.cache as Settings | undefined) ?? DEFAULTS
 	} catch {
 		return DEFAULTS
 	}
@@ -446,7 +448,7 @@ export default plugin<{ jsonStorage: Settings }>({
 				'MESSAGE_CREATE',
 				(payload: MessageCreatePayload | null) => {
 					try {
-						const current = jsonStorage.cache ?? DEFAULTS
+						const current = (jsonStorage.cache ?? DEFAULTS) as Settings
 						if (current.enabled === false || !payload) return payload
 						const message = payload.message
 						const channelId = message?.channel_id ?? payload.channelId
@@ -481,8 +483,20 @@ export default plugin<{ jsonStorage: Settings }>({
 		}
 		logger?.log?.('[Streaks] started')
 	},
-	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
-		const settings = api.jsonStorage.use() ?? DEFAULTS
+	// The storage is typed structurally here: the framework hands over its own
+	// JsonStorage, whose `use()` may also return a plain object, and narrowing it
+	// to this plugin's Settings is the cast's job.
+	SettingsComponent({
+		api,
+	}: {
+		api: {
+			jsonStorage: {
+				use(): unknown
+				set(patch: Partial<Settings>): Promise<unknown>
+			}
+		}
+	}) {
+		const settings = (api.jsonStorage.use() ?? DEFAULTS) as Settings
 		const set = (patch: Partial<Settings>) =>
 			api.jsonStorage.set(patch).catch?.(() => {})
 		const today = dayKey(Date.now())

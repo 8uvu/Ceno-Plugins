@@ -8,6 +8,7 @@
 		"generate-index": "valenced-plugin generate-index",
 		"plan-releases": "valenced-plugin plan-releases --plugins-dir plugins --plugins-dir themes",
 		"serve": "valenced-plugin serve",
+		"verify": "node scripts/verify-all.cjs",
 		"lint": "biome check",
 		"lint:types": "tsc -b plugins/*/tsconfig.json themes/*/tsconfig.json && tsc -p cli --noEmit"
 	},
