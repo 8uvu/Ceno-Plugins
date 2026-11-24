@@ -3,6 +3,30 @@
   "name": "Ceno Plugins",
   "description": "Small Valenced plugins by cenotaph.",
   "plugins": {
+    "dev.8uvu.bookmarks": {
+      "name": "Bookmarks",
+      "description": "Hold any message and keep it on this device: the text, its author, the channel and the time. Nothing is uploaded and attachments are only named.",
+      "author": "cenotaph",
+      "icon": "BookmarkIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.bookmarks@1.0.0.zip",
+          "sha256": "98443b9030471dacc7bf955138c5fc34ac5447270164da0872c1920c00c86872",
+          "size": 3650,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "dev.8uvu.clean-urls": {
       "name": "Clean URLs",
       "description": "Strips tracking parameters from links.",
@@ -181,6 +205,54 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.1.8.zip",
           "sha256": "821dc8b174057cd3f0617c005f0f0c5a94e124abc2ddbc2db8fe8bc7d7163695",
           "size": 5245,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.keywords": {
+      "name": "Keywords",
+      "description": "Get a toast when a message contains a word you follow: whole words, one per channel a minute, your own messages ignored. The list stays on this device.",
+      "author": "cenotaph",
+      "icon": "BellIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.keywords@1.0.0.zip",
+          "sha256": "989c4b66d68975ccaed929351f524be10e387e0503e5ecffdcaf167d7850bb71",
+          "size": 3043,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.last-seen": {
+      "name": "Last Seen",
+      "description": "Keeps a local record of when people came online and when they went away, so you can tell whether someone was around. Nothing is uploaded.",
+      "author": "cenotaph",
+      "icon": "ClockIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.last-seen@1.0.0.zip",
+          "sha256": "b9a35a86a8bf35a70981a54fe512ec1cf2668a8142c6b2d0833bd2928ba8f6fd",
+          "size": 2789,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
