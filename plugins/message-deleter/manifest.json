@@ -2,10 +2,10 @@
 	"format": 1,
 	"id": "dev.8uvu.dm-deleter",
 	"name": "Message Deleter",
-	"description": "Search your own messages in a DM the way Discrub does, tick what should go, and delete them one request at a time. Every delete asks first and respects Discord's limits.",
+	"description": "Hold a message and delete what you sent in that chat: one message, or every message of yours in the conversation, one request at a time. Asks first and obeys Discord's limits.",
 	"author": "cenotaph",
 	"icon": "TrashIcon",
-	"version": "2.2.0",
+	"version": "3.0.0",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"
