@@ -29,11 +29,11 @@
     },
     "dev.8uvu.dm-deleter": {
       "name": "Message Deleter",
-      "description": "Delete your own messages in a DM: hold one message, or open the chat's list and pick several. Every delete asks first and respects Discord's limits.",
+      "description": "Search your own messages in a DM the way Discrub does, tick what should go, and delete them one request at a time. Every delete asks first and respects Discord's limits.",
       "author": "cenotaph",
       "icon": "TrashIcon",
       "channels": {
-        "latest": "2.1.3"
+        "latest": "2.2.0"
       },
       "versions": {
         "1.0.0": {
@@ -131,6 +131,19 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.1.3.zip",
           "sha256": "57c4f4936e8feeacaf2535189e26b5fb9bb1640b678ec7cda7a29517caff4be7",
           "size": 6346,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "2.2.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.2.0.zip",
+          "sha256": "e277211720dcf0d79f97a61caabdc7f7ad90e7a98f0c9aa7e06bd580481f63a1",
+          "size": 7546,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
