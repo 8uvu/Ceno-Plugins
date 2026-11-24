@@ -33,7 +33,7 @@
       "author": "cenotaph",
       "icon": "TrashIcon",
       "channels": {
-        "latest": "2.1.0"
+        "latest": "2.1.1"
       },
       "versions": {
         "1.0.0": {
@@ -92,6 +92,19 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.1.0.zip",
           "sha256": "37119cf3e50c6ecd09e74dff91378474a05d9c74aaddba31452351bbc712c6a2",
           "size": 5977,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "2.1.1": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@2.1.1.zip",
+          "sha256": "6c2cc34a338d3804ff276af72d1e6ad5376cda617902e065099a0d1df7387149",
+          "size": 6046,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
