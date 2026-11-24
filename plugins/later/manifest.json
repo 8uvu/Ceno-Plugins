@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.later",
+	"name": "Later",
+	"description": "Hold a message and be pinged about it in an hour, in three hours, or tomorrow. Local only.",
+	"author": "cenotaph",
+	"icon": "ClockIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

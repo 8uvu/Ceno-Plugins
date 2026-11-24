@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.watchlist",
+	"name": "Watchlist",
+	"description": "Get a toast when someone you are watching comes online, starts typing to you, or sends you a message. Stays on this device.",
+	"author": "cenotaph",
+	"icon": "EyeIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

@@ -21,6 +21,9 @@ in the background.
 | Plugin | What it does | Version |
 | --- | --- | --- |
 | **Message Deleter** | Hold a message and delete what you sent in that chat: one message, or all of them, a second apart. | 3.0.0 |
+| **Message Logger** | Keeps the edits and deletions this device saw, with the text before and after. | 1.0.0 |
+| **Watchlist** | Get a toast when someone you watch comes online, types to you, or sends a message. | 1.0.0 |
+| **Later** | Hold a message and be pinged about it in an hour, in three hours, or tomorrow. | 1.0.0 |
 | **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.1.0 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
@@ -52,6 +55,61 @@ conversation.
 **Settings page:** what each row does, the last result, and a *Diagnostics*
 group — message menu, chat menu, delete action, chat history — that names the
 piece a build did or did not provide, so a missing row can be reported exactly.
+
+## Message Logger
+
+A local journal of what changed: when a message you saw is edited or deleted,
+the old text is kept so you can still read it.
+
+- **Edits keep both versions.** The page shows `“before” → “after”`, with the
+  author, the channel and how long ago it happened.
+- **Deletions keep the last text.** A message that vanished is listed with what
+  it said while it was still there.
+- **It only logs what it saw.** A message that arrived before the plugin started
+  has no earlier text to compare with, and is not logged — the page says so
+  rather than pretending otherwise.
+- **A journal, not a second chat.** Nothing is uploaded, nothing is re-drawn into
+  the conversation, and the last 500 messages are held in memory only to notice a
+  change.
+- **Capped and clearable:** 200 entries by default (20–1000), with a row that
+  wipes the log.
+
+**Settings page:** the switch, the size of the log, what it can and cannot see,
+and the 20 most recent entries with their before/after text.
+
+## Watchlist
+
+Some people are worth a tap on the shoulder. Add them from a message and get a
+toast when they are around.
+
+- **Watch from the message menu.** Hold any message and pick *Watch <name>*; the
+  same row becomes *Stop watching <name>* afterwards.
+- **Three notifications, three switches:** coming online, starting to type to
+  you, and sending a message.
+- **Quiet by design.** One toast per person per kind of event — 15 seconds for
+  typing, 5 for messages, 60 for presence — and presence only fires on a change
+  out of offline, so a client that repeats presence cannot spam you.
+- **Your own messages are ignored,** and so is everyone not on the list.
+- **Stays on this device.** No account, no server, no token.
+
+**Settings page:** the four switches and the list of watched people, with a tap
+that removes one.
+
+## Later
+
+Hold a message and ask to be pinged about it in an hour, in three hours, or
+tomorrow — useful for the message you cannot deal with right now.
+
+- **Three delays in the message menu,** plus *Cancel the ping for this message*
+  once one exists. Pressing the same delay again replaces the ping instead of
+  duplicating it.
+- **The ping is a toast** that quotes the message, its author and the channel.
+- **Honest about the app being closed.** A ping that came due while Discord was
+  closed is shown the next time the plugin starts, not as a phone notification.
+- **Capped at 50 pings,** soonest first, and the page can cancel them all.
+
+**Settings page:** the switch, the waiting pings in order, and the row that
+cancels every one.
 
 ## TypingWatch
 
@@ -169,7 +227,10 @@ plugins/
 ├── dont-control-me/
 ├── streaks/
 ├── message-deleter/
-└── _shared/                     # theme tokens and shared runtime types
+├── message-logger/
+├── watchlist/
+├── later/
+└── _shared/                     # theme tokens and the shared menu patch
 scripts/                         # the verifier harness and its runner
 themes/                          # theme plugins, built and packaged like plugins/
 types/                           # declarations for the @valenced/* imports

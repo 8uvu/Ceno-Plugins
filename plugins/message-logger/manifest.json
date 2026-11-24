@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.message-logger",
+	"name": "Message Logger",
+	"description": "Keeps the edits and deletions this device saw, with the text before and after. Local only.",
+	"author": "cenotaph",
+	"icon": "ListBulletsIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}
