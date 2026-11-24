@@ -1,10 +1,12 @@
 // Message Deleter, by cenotaph.
 //
-// Two ways to delete, both through Discord's own message actions:
+// Three ways to delete, all through Discord's own message actions:
 //
 //   * hold one message you sent in a DM and delete that one message;
-//   * hold a message and open the chat's message list, tick what should go and
-//     delete the selection, one request at a time.
+//   * hold a message and open the chat's message list: search the conversation
+//     the way the Discrub extension does, tick what should go and delete the
+//     selection, one request at a time;
+//   * hold a message and delete every message you sent in the chat at once.
 //
 // The list is built from what Discord's own client already holds for the chat
 // (or its own fetch action when the build has one). No private endpoint, no
@@ -22,7 +24,7 @@ import { withName, withProps } from '@valenced/modules/finders/filters'
 import { instead } from '@valenced/patcher'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
 import { useEffect, useState } from 'react'
-import { Alert, ScrollView, Text } from 'react-native'
+import { Alert, ScrollView, Text, TextInput, View } from 'react-native'
 import { readableText, settingsScroll, token } from '../../_shared/theme'
 import { asRecord, errorMessage } from '../../_shared/types'
 import type { DesignComponent, DesignShim, Logger } from '../../_shared/types'
@@ -42,8 +44,17 @@ const WAIT_MARGIN_MS = 250
 // Past this, waiting is worse than saying so: the run stops and reports the
 // limit instead of holding a request open.
 const MAX_WAIT_MS = 60000
-// One page of history per open. The list is a picker, not an archive.
+// One page of history per request, the size Discord's own client asks for.
 const PAGE_LIMIT = 50
+// Discrub loads the whole conversation before it shows its table, so a search
+// walks back too: twenty pages is a thousand messages, which is past the point
+// where a picker is still a picker.
+const MAX_PAGES = 20
+// Between two pages, so a long search is a slow walk and not a burst.
+const PAGE_PAUSE_MS = 300
+// Result rows drawn before the "Show more" row: the sheet stays light, and the
+// select-all switch still covers everything the search found.
+const SHOW_LIMIT = 100
 
 interface UserLike {
 	id?: string
@@ -136,6 +147,9 @@ let disposed = false
 // A bulk run is guarded separately: it outlives the sheet that started it.
 let batchRunning = false
 let batchCancelled = false
+let batchPaused = false
+let searchCancelled = false
+let listAlive = true
 let sheetState: SheetState | null = null
 const timers = new Set<ReturnType<typeof setTimeout>>()
 
@@ -409,8 +423,12 @@ function loadedMessages(channelId: string): MessageLike[] {
 }
 
 // Discord's own fetch action, when the build has one. It goes through the
-// client's auth and rate limiter, exactly like scrolling the chat.
-async function fetchMessages(channelId: string): Promise<MessageLike[]> {
+// client's auth and rate limiter, exactly like scrolling the chat. `before` is
+// the oldest id already held, so each call walks further back in the chat.
+async function fetchMessages(
+	channelId: string,
+	before?: string,
+): Promise<MessageLike[]> {
 	try {
 		const [module] = lookupModule(withProps('fetchMessages')) as [
 			unknown,
@@ -421,8 +439,14 @@ async function fetchMessages(channelId: string): Promise<MessageLike[]> {
 		const call = fetch as (args: unknown, limit?: number) => unknown
 		let raw: unknown
 		try {
-			raw = await call({ channelId, limit: PAGE_LIMIT })
+			raw = await call({
+				channelId,
+				limit: PAGE_LIMIT,
+				...(before ? { before } : {}),
+			})
 		} catch {
+			// A build that takes the channel and the limit positionally cannot page
+			// back; the search then stops after that page instead of repeating it.
 			raw = await call(channelId, PAGE_LIMIT)
 		}
 		const messages = normalise(raw)
@@ -431,6 +455,91 @@ async function fetchMessages(channelId: string): Promise<MessageLike[]> {
 	} catch {
 		return []
 	}
+}
+
+// When a message was sent, in milliseconds. A snowflake carries its creation
+// time in its high bits, so it still sorts on a build without timestamps.
+function stampOf(message: MessageLike): number {
+	const raw = typeof message.timestamp === 'string' ? message.timestamp : ''
+	const parsed = raw ? new Date(raw).getTime() : Number.NaN
+	if (!Number.isNaN(parsed)) return parsed
+	const id = typeof message.id === 'string' ? message.id : ''
+	return /^\d+$/.test(id) ? Number(id) / 4194304 : 0
+}
+
+function contentOf(message: MessageLike): string {
+	return typeof message.content === 'string' ? message.content : ''
+}
+
+function sortMessages(
+	messages: MessageLike[],
+	newestFirst: boolean,
+): MessageLike[] {
+	return [...messages].sort((left, right) => {
+		const difference = stampOf(right) - stampOf(left)
+		return newestFirst ? difference : -difference
+	})
+}
+
+// The oldest message in a batch, which is the cursor the next page asks for.
+function oldestId(messages: MessageLike[]): string {
+	let oldest = ''
+	let oldestStamp = Number.POSITIVE_INFINITY
+	for (const message of messages) {
+		if (typeof message.id !== 'string' || !message.id) continue
+		const stamp = stampOf(message)
+		if (stamp < oldestStamp) {
+			oldestStamp = stamp
+			oldest = message.id
+		}
+	}
+	return oldest
+}
+
+interface LoadHooks {
+	onProgress(found: number): void
+	shouldStop(): boolean
+}
+
+// Discrub loads the whole conversation before it shows its table, so the list
+// is the chat and not the last screenful of it. This starts from what the
+// client already holds and walks backwards a page at a time until a page brings
+// nothing older, the cap is reached, or the user stops it.
+async function loadAllMine(
+	channelId: string,
+	hooks: LoadHooks,
+): Promise<MessageLike[]> {
+	const seen = new Set<string>()
+	const found: MessageLike[] = []
+	const keep = (messages: MessageLike[]): void => {
+		for (const message of ownMessages(messages)) {
+			const id = message.id ?? ''
+			if (!id || seen.has(id)) continue
+			seen.add(id)
+			found.push(message)
+		}
+	}
+	let before = ''
+	try {
+		const cached = loadedMessages(channelId)
+		keep(cached)
+		before = oldestId(cached)
+	} catch {}
+	hooks.onProgress(found.length)
+	for (let page = 0; page < MAX_PAGES; page++) {
+		if (hooks.shouldStop() || disposed) break
+		const batch = await fetchMessages(channelId, before || undefined)
+		if (!batch.length) break
+		keep(batch)
+		hooks.onProgress(found.length)
+		const oldest = oldestId(batch)
+		if (!oldest || oldest === before) break
+		before = oldest
+		if (batch.length < PAGE_LIMIT) break
+		if (hooks.shouldStop()) break
+		await sleep(PAGE_PAUSE_MS)
+	}
+	return sortMessages(found, true)
 }
 
 // ─── Deleting a selection ────────────────────────────────────────────────────
@@ -444,6 +553,12 @@ function cancelBatch(): void {
 	batchCancelled = true
 }
 
+// Pausing only takes effect between two deletes: the request already in flight
+// is never abandoned half-done.
+function pauseBatch(paused: boolean): void {
+	batchPaused = paused
+}
+
 // Sequential on purpose: one request at a time, so the client's rate limiter
 // sees each delete, and a limit stops the run instead of hammering it.
 async function deleteBatch(
@@ -454,10 +569,14 @@ async function deleteBatch(
 	if (batchRunning || ids.length === 0) return
 	batchRunning = true
 	batchCancelled = false
+	batchPaused = false
 	let deleted = 0
 	let failure = ''
 	try {
 		for (let index = 0; index < ids.length; index++) {
+			while (batchPaused && !batchCancelled && !disposed) {
+				await sleep(200)
+			}
 			if (batchCancelled || disposed) break
 			hooks.onProgress(`Deleting ${index + 1} of ${ids.length}…`)
 			try {
@@ -552,7 +671,7 @@ function askToDeleteMany(count: number, run: () => void): void {
 	const Action = design.AlertActionButton
 	const title =
 		count === 1 ? 'Delete this message?' : `Delete ${count} messages?`
-	const content = 'They are removed for everyone and this cannot be undone.'
+	const content = `Messages · ${count} selected. They are removed for everyone and this cannot be undone.`
 	if (typeof Modal === 'function' && typeof Action === 'function') {
 		try {
 			AlertActionCreators.openAlert(
@@ -637,10 +756,56 @@ interface BulkSheetProps {
 	inAlert?: boolean
 }
 
-// The Discrub layout, drawn with Discord's own rows: one row per message with a
-// checkbox, a select-all switch, a live count, and a red delete row. It only
-// ever offers the account's own messages, because Discord will not let it
-// delete anybody else's in a DM.
+type Phase = 'idle' | 'searching' | 'ready'
+
+// The one part of Discrub's search criteria a phone can offer without a second
+// screen. React Native's own input, because Discord's design input ignores
+// typing on the builds this ships to.
+function SearchField({
+	value,
+	onChange,
+}: {
+	value: string
+	onChange: (next: string) => void
+}): unknown {
+	return (
+		<View style={{ marginVertical: 8 }}>
+			<Text
+				style={{
+					color: readableText('TEXT_MUTED'),
+					fontSize: 12,
+					fontWeight: '700',
+					letterSpacing: 0.4,
+					marginBottom: 6,
+				}}
+			>
+				MESSAGE CONTAINS
+			</Text>
+			<TextInput
+				value={value}
+				onChangeText={onChange}
+				placeholder="Anything, or leave it empty"
+				placeholderTextColor={readableText('TEXT_MUTED')}
+				autoCorrect={false}
+				autoCapitalize="none"
+				style={{
+					color: readableText(),
+					backgroundColor:
+						token('BACKGROUND_TERTIARY') ?? token('BACKGROUND_SECONDARY'),
+					borderRadius: 8,
+					paddingHorizontal: 12,
+					paddingVertical: 10,
+					fontSize: 15,
+				}}
+			/>
+		</View>
+	)
+}
+
+// The Discrub flow, drawn with Discord's own rows: the criteria, a search that
+// walks the whole conversation, the messages it found with a checkbox each, and
+// the trash. Only the account's own messages are ever listed, because Discord
+// will not let it delete anybody else's in a DM.
 function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 	const Group = design.TableRowGroup
 	const Row = design.TableRow
@@ -649,15 +814,7 @@ function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 	const channelId =
 		typeof sheetState?.channel.id === 'string' ? sheetState.channel.id : ''
 
-	const cached = (() => {
-		try {
-			return ownMessages(loadedMessages(channelId))
-		} catch {
-			return []
-		}
-	})()
-
-	const [messages, setMessages] = useState(cached) as [
+	const [messages, setMessages] = useState([]) as [
 		MessageLike[],
 		(next: MessageLike[] | ((prev: MessageLike[]) => MessageLike[])) => void,
 	]
@@ -669,39 +826,46 @@ function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 				| ((prev: Record<string, boolean>) => Record<string, boolean>),
 		) => void,
 	]
-	const [note, setNote] = useState(
-		cached.length ? '' : 'Reading this chat…',
-	) as [string, (next: string | ((prev: string) => string)) => void]
+	const [query, setQuery] = useState('') as [string, (next: string) => void]
+	const [newestFirst, setNewestFirst] = useState(true) as [
+		boolean,
+		(next: boolean) => void,
+	]
+	const [phase, setPhase] = useState('idle') as [Phase, (next: Phase) => void]
+	const [note, setNote] = useState('') as [
+		string,
+		(next: string | ((prev: string) => string)) => void,
+	]
 	const [progress, setProgress] = useState('') as [
 		string,
 		(next: string | ((prev: string) => string)) => void,
 	]
+	const [shown, setShown] = useState(SHOW_LIMIT) as [
+		number,
+		(next: number) => void,
+	]
+	const [paused, setPaused] = useState(false) as [
+		boolean,
+		(next: boolean) => void,
+	]
 
+	// Leaving the sheet ends what it started: a search stops walking, and a
+	// delete run stops after the request already in flight.
 	useEffect(() => {
-		if (cached.length || !channelId) return
-		let live = true
-		void (async () => {
-			const all = await fetchMessages(channelId)
-			if (!live) return
-			const fetched = ownMessages(all)
-			if (fetched.length) {
-				setMessages(fetched)
-				setNote('')
-			} else if (all.length) {
-				setNote('You have not sent anything in this chat yet.')
-			} else {
-				setNote(
-					'This build does not expose the chat’s messages. Scroll the chat and try again.',
-				)
-			}
-		})()
+		listAlive = true
 		return () => {
-			live = false
+			listAlive = false
+			searchCancelled = true
 		}
 	}, [])
 
-	const count = messages.length
-	const chosen = messages.filter(message => selected[message.id ?? ''])
+	const needle = query.trim().toLowerCase()
+	const matching = messages.filter(
+		message => !needle || contentOf(message).toLowerCase().includes(needle),
+	)
+	const ordered = sortMessages(matching, newestFirst)
+	const count = ordered.length
+	const chosen = ordered.filter(message => selected[message.id ?? ''])
 	const allChosen = count > 0 && chosen.length === count
 	const running = batchRunning
 
@@ -720,10 +884,38 @@ function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 			return
 		}
 		const next: Record<string, boolean> = {}
-		for (const message of messages) {
+		for (const message of ordered) {
 			if (message.id) next[message.id] = true
 		}
 		setSelected(next)
+	}
+
+	// Search walks every page of the chat, the way Discrub does, so the table is
+	// the conversation and not just the last screenful of it.
+	const search = (): void => {
+		if (phase === 'searching' || !channelId) return
+		searchCancelled = false
+		setPhase('searching')
+		setProgress('Reading this chat…')
+		setNote('')
+		void (async () => {
+			const found = await loadAllMine(channelId, {
+				onProgress: total => {
+					if (listAlive)
+						setProgress(total ? `${total} found…` : 'Reading this chat…')
+				},
+				shouldStop: () => searchCancelled || !listAlive,
+			})
+			if (!listAlive) return
+			setMessages(found)
+			setSelected({})
+			setShown(SHOW_LIMIT)
+			setProgress('')
+			setPhase('ready')
+			setNote(
+				found.length ? '' : 'You have not sent anything in this chat yet.',
+			)
+		})()
 	}
 
 	const run = (): void => {
@@ -736,24 +928,28 @@ function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 				onProgress: text => {
 					setProgress(text)
 				},
-				onDone: text => {
-					setProgress('')
-					setNote(text)
+				onDone: (text, deleted) => {
+					// The run deletes in order, so the first `deleted` ids are the ones
+					// that went; anything left stays on the list to try again.
+					const gone = new Set(ids.slice(0, deleted))
+					setMessages(previous =>
+						previous.filter(message => !gone.has(message.id ?? '')),
+					)
 					setSelected({})
+					setProgress('')
+					setPaused(false)
+					setNote(text)
 				},
 			})
 		})
 	}
 
-	const stop = (): void => {
-		cancelBatch()
-		setProgress('')
-	}
-
 	const summary =
-		count === 0
-			? note || 'No messages from you in this chat.'
-			: `${chosen.length} of ${count} selected`
+		phase === 'idle'
+			? 'Press Search to find your messages in this chat.'
+			: count === 0
+				? note || 'Nothing of yours matches.'
+				: `${chosen.length} of ${count} selected`
 
 	if (typeof Group !== 'function' || typeof Row !== 'function') {
 		return (
@@ -766,48 +962,98 @@ function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 	return (
 		<ScrollView style={settingsScroll}>
 			<Group
-				title="Delete messages"
-				description="Only the messages you sent are listed, and deleting cannot be undone."
+				title="Search"
+				description="Only the messages you sent are searched, and deleting cannot be undone."
 			>
+				<Row label="User" subLabel="You" arrow={false} />
+				<SearchField value={query} onChange={setQuery} />
 				{SwitchRow ? (
 					<SwitchRow
-						label="Select all"
-						subLabel={`${count} message${count === 1 ? '' : 's'} listed`}
-						value={allChosen}
-						onValueChange={chooseAll}
+						label="Newest first"
+						subLabel={
+							newestFirst
+								? 'Newest message at the top.'
+								: 'Oldest message at the top.'
+						}
+						value={newestFirst}
+						onValueChange={setNewestFirst}
 					/>
 				) : null}
-				{count === 0 ? (
-					<Row label="Nothing of yours listed" subLabel={summary} />
-				) : (
-					messages.map(message => {
-						const id = message.id ?? ''
-						const label = `${authorOf(message)} · ${timeOf(message) || 'no time'}`
-						if (CheckRow) {
+				<Row
+					label={phase === 'searching' ? 'Searching…' : 'Search'}
+					subLabel={
+						phase === 'searching'
+							? progress
+							: phase === 'ready'
+								? `${count} found. Search again to refresh.`
+								: 'Loads every message you sent in this chat.'
+					}
+					arrow={false}
+					disabled={phase === 'searching'}
+					onPress={search}
+				/>
+				{phase === 'searching' ? (
+					<Row
+						label="Stop searching"
+						subLabel="Keeps what has been found so far."
+						onPress={() => {
+							searchCancelled = true
+						}}
+					/>
+				) : null}
+			</Group>
+			{phase === 'ready' ? (
+				<Group title="Messages" description={note || summary}>
+					{SwitchRow && count > 0 ? (
+						<SwitchRow
+							label="Select all"
+							subLabel={`${chosen.length} of ${count} selected`}
+							value={allChosen}
+							onValueChange={chooseAll}
+						/>
+					) : null}
+					{count === 0 ? (
+						<Row
+							label="Nothing listed"
+							subLabel={note || 'Nothing of yours matches.'}
+						/>
+					) : (
+						ordered.slice(0, shown).map(message => {
+							const id = message.id ?? ''
+							const label = `${authorOf(message)} · ${timeOf(message) || 'no time'}`
+							if (CheckRow) {
+								return (
+									<CheckRow
+										key={id}
+										value={id}
+										label={label}
+										subLabel={previewOf(message)}
+										checked={selected[id] === true}
+										onPress={() => toggle(id)}
+									/>
+								)
+							}
 							return (
-								<CheckRow
+								<Row
 									key={id}
-									value={id}
 									label={label}
 									subLabel={previewOf(message)}
-									checked={selected[id] === true}
+									arrow={false}
 									onPress={() => toggle(id)}
 								/>
 							)
-						}
-						return (
-							<Row
-								key={id}
-								label={label}
-								subLabel={previewOf(message)}
-								arrow={false}
-								onPress={() => toggle(id)}
-							/>
-						)
-					})
-				)}
-			</Group>
-			<Group title={progress || summary}>
+						})
+					)}
+					{count > shown ? (
+						<Row
+							label="Show more"
+							subLabel={`${shown} of ${count} shown. Select all covers every one.`}
+							onPress={() => setShown(shown + SHOW_LIMIT)}
+						/>
+					) : null}
+				</Group>
+			) : null}
+			<Group title="Delete" description={progress || summary}>
 				<Row
 					label={
 						running
@@ -825,22 +1071,41 @@ function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 					disabled={running || chosen.length === 0}
 					onPress={run}
 				/>
-				{(running || !inAlert) && (
+				{running ? (
 					<Row
-						label={running ? 'Stop deleting' : 'Close'}
+						label={paused ? 'Resume deleting' : 'Pause deleting'}
+						subLabel={
+							paused
+								? 'The run waits here until you resume.'
+								: 'Finishes the message already being deleted.'
+						}
+						onPress={() => {
+							pauseBatch(!paused)
+							setPaused(!paused)
+						}}
+					/>
+				) : null}
+				{running || !inAlert ? (
+					<Row
+						label={running ? 'Cancel deleting' : 'Close'}
 						subLabel={
 							running
 								? 'Finishes the message already being deleted.'
 								: undefined
 						}
 						onPress={() => {
-							if (running) stop()
+							if (running) {
+								cancelBatch()
+								pauseBatch(false)
+								setPaused(false)
+								setProgress('')
+							}
 							try {
 								ActionSheetActionCreators.hideActionSheet()
 							} catch {}
 						}}
 					/>
-				)}
+				) : null}
 			</Group>
 		</ScrollView>
 	)
@@ -950,10 +1215,15 @@ function deleteAllMine(channel: ChannelLike): void {
 	const channelId = typeof channel.id === 'string' ? channel.id : ''
 	if (!channelId || batchRunning) return
 	void (async () => {
-		const cached = ownMessages(loadedMessages(channelId))
-		const found = cached.length
-			? cached
-			: ownMessages(await fetchMessages(channelId))
+		setStatus('working', 'Finding your messages…')
+		const found = await loadAllMine(channelId, {
+			onProgress: total =>
+				setStatus(
+					'working',
+					total ? `Found ${total}…` : 'Finding your messages…',
+				),
+			shouldStop: () => disposed,
+		})
 		const ids = found
 			.map(message => (typeof message.id === 'string' ? message.id : ''))
 			.filter(Boolean)
@@ -1197,15 +1467,19 @@ export default plugin({
 				<ScrollView style={settingsScroll}>
 					<Group
 						title="Message Deleter"
-						description="Delete your own messages in a DM, one at a time or from the chat’s list."
+						description="The Discrub flow for a phone: search your messages in a DM, tick what should go, delete them."
 					>
 						<Row
 							label="Delete one message"
 							subLabel="Hold a message you sent, then choose Delete message."
 						/>
 						<Row
-							label="Delete several"
-							subLabel="Hold any message, then choose Delete messages in this chat…"
+							label="Search and pick"
+							subLabel="Hold any message, choose Delete messages in this chat, then Search."
+						/>
+						<Row
+							label="Delete everything you sent"
+							subLabel="Hold any message and choose Delete all my messages."
 						/>
 						<Row
 							label="Nothing runs on its own"
