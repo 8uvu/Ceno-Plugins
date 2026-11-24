@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.dm-deleter",
+	"name": "Message Deleter",
+	"description": "Hold a message you sent in a DM and delete that one message, after a confirmation with a preview. Nothing else is touched.",
+	"author": "cenotaph",
+	"icon": "TrashIcon",
+	"version": "2.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}
