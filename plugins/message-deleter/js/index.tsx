@@ -1,15 +1,18 @@
 // Message Deleter, by cenotaph.
 //
-// One action in Discord's own message menu: hold a message you sent in a DM,
-// choose "Delete message", confirm against a preview of it, and Discord is
-// asked to delete that one message. There is no search, no history loading, no
-// selection and no queue: one press, one confirmation, one request. A message
-// that is not yours is never offered.
+// Two ways to delete, both through Discord's own message actions:
 //
-// The request goes through Discord's own message actions, so the login token
-// stays inside the client and the client's rate limiter still sees the call.
+//   * hold one message you sent in a DM and delete that one message;
+//   * hold a message and open the chat's message list, tick what should go and
+//     delete the selection, one request at a time.
+//
+// The list is built from what Discord's own client already holds for the chat
+// (or its own fetch action when the build has one). No private endpoint, no
+// copied token, and every delete goes through the client's own rate limiter:
+// a 429 is waited out once for the delay Discord names, never worked around.
 import {
 	ActionSheetActionCreators,
+	AlertActionCreators,
 	ToastActionCreators,
 } from '@valenced/discord/actions'
 import { Design } from '@valenced/discord/design'
@@ -18,8 +21,9 @@ import { getModules, lookupModule } from '@valenced/modules/finders'
 import { withName, withProps } from '@valenced/modules/finders/filters'
 import { instead } from '@valenced/patcher'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
+import { useEffect, useState } from 'react'
 import { Alert, ScrollView, Text } from 'react-native'
-import { settingsScroll, token } from '../../_shared/theme'
+import { readableText, settingsScroll, token } from '../../_shared/theme'
 import { asRecord, errorMessage } from '../../_shared/types'
 import type { DesignComponent, DesignShim, Logger } from '../../_shared/types'
 
@@ -29,23 +33,29 @@ import type { DesignComponent, DesignShim, Logger } from '../../_shared/types'
 const DM = 1
 const GROUP_DM = 3
 
-// The sheet is already closing when the row is pressed, so the confirmation is
+// The sheet is already closing when a row is pressed, so the next surface is
 // shown after it has gone rather than underneath it.
 const CONFIRM_DELAY_MS = 200
 // Discord's retry_after is honoured as given; this only rounds up and adds a
-// small margin, so the retry can never be earlier than the limit allows.
+// small margin, so a retry can never be earlier than the limit allows.
 const WAIT_MARGIN_MS = 250
-// Past this, waiting is worse than saying so: the action stops and reports the
+// Past this, waiting is worse than saying so: the run stops and reports the
 // limit instead of holding a request open.
 const MAX_WAIT_MS = 60000
+// One page of history per open. The list is a picker, not an archive.
+const PAGE_LIMIT = 50
 
 interface UserLike {
 	id?: string
+	username?: string
+	globalName?: string
+	global_name?: string
 }
 
 interface MessageLike {
 	id?: string
 	content?: string
+	timestamp?: string
 	author?: UserLike
 	attachments?: unknown[]
 	embeds?: unknown[]
@@ -56,6 +66,9 @@ interface MessageLike {
 interface ChannelLike {
 	id?: string
 	type?: number
+	name?: string
+	recipients?: unknown[]
+	rawRecipients?: unknown[]
 }
 
 interface SheetProps {
@@ -82,6 +95,7 @@ interface DesignLike {
 
 interface MessageActionsLike {
 	deleteMessage(channelId: string, messageId: string): unknown
+	fetchMessages?: (args: unknown, limit?: number) => unknown
 }
 
 type Tone = 'idle' | 'working' | 'ok' | 'error'
@@ -92,12 +106,19 @@ interface Status {
 }
 
 interface Diagnostics {
-	// The long-press menu was found and our row is being added to it.
+	// The long-press menu was found and our rows are being added to it.
 	sheet: boolean
 	// Discord's own delete action was found.
 	actions: boolean
-	// Why the menu is not there, when it is not.
+	// Which module the message list came from, and how it went.
+	history: string
+	// Why something is missing, when it is.
 	note: string
+}
+
+interface SheetState {
+	channel: ChannelLike
+	anchor?: MessageLike
 }
 
 let logger: Logger | undefined
@@ -105,6 +126,7 @@ let status: Status = { tone: 'idle', text: '' }
 const diagnostics: Diagnostics = {
 	sheet: false,
 	actions: false,
+	history: '',
 	note: '',
 }
 // One confirmation and one request at a time. Both are set synchronously, so a
@@ -112,6 +134,10 @@ const diagnostics: Diagnostics = {
 let pending = false
 let busy = false
 let disposed = false
+// A bulk run is guarded separately: it outlives the sheet that started it.
+let batchRunning = false
+let batchCancelled = false
+let sheetState: SheetState | null = null
 const timers = new Set<ReturnType<typeof setTimeout>>()
 
 function setStatus(tone: Tone, text: string): void {
@@ -143,7 +169,13 @@ function eligible(message?: MessageLike, channel?: ChannelLike): boolean {
 	return typeof message.author?.id === 'string' && message.author.id === me
 }
 
-// What the confirmation shows: the message itself, shortened, or a plain
+function mine(message?: MessageLike): boolean {
+	const me = currentUserId()
+	if (!me || !message) return false
+	return typeof message.author?.id === 'string' && message.author.id === me
+}
+
+// What a row or a confirmation shows: the message itself, shortened, or a plain
 // description when it has no text.
 function previewOf(message: MessageLike): string {
 	let text = typeof message.content === 'string' ? message.content.trim() : ''
@@ -157,6 +189,32 @@ function previewOf(message: MessageLike): string {
 	if (!text) text = 'A message with no text'
 	if (text.length > 160) text = `${text.slice(0, 157)}…`
 	return text
+}
+
+function timeOf(message: MessageLike): string {
+	const raw = typeof message.timestamp === 'string' ? message.timestamp : ''
+	if (!raw) return ''
+	const date = new Date(raw)
+	if (Number.isNaN(date.getTime())) return ''
+	const hours = String(date.getHours()).padStart(2, '0')
+	const minutes = String(date.getMinutes()).padStart(2, '0')
+	return `${hours}:${minutes}`
+}
+
+function authorOf(message: MessageLike): string {
+	const author = message.author
+	if (!author) return 'Unknown'
+	if (mine(message)) return 'You'
+	const named =
+		typeof author.globalName === 'string'
+			? author.globalName
+			: typeof author.global_name === 'string'
+				? author.global_name
+				: ''
+	if (named) return named
+	return typeof author.username === 'string' && author.username
+		? author.username
+		: 'Unknown'
 }
 
 function resolveActions(): MessageActionsLike | null {
@@ -243,62 +301,199 @@ function notify(text: string, variant: ToastVariant): void {
 	} catch {}
 }
 
+// ─── Discord's own delete action ─────────────────────────────────────────────
+
 // One message, one request. A rate limit is waited out exactly once, for the
 // delay Discord named, and then the action stops rather than retrying further.
-async function deleteOne(
-	message: MessageLike,
-	channel: ChannelLike,
+async function deleteWithRetry(
+	channelId: string,
+	messageId: string,
 ): Promise<void> {
-	const channelId = typeof channel.id === 'string' ? channel.id : ''
-	const messageId = typeof message.id === 'string' ? message.id : ''
-	if (!channelId || !messageId || busy) return
-	busy = true
-	setStatus('working', 'Deleting the message…')
+	const api = resolveActions()
+	if (!api) throw new Error('this build does not expose message actions')
 	try {
-		const api = resolveActions()
-		if (!api) throw new Error('this build does not expose message actions')
-		try {
-			await api.deleteMessage(channelId, messageId)
-		} catch (error) {
-			const wait = rateLimitWait(error)
-			if (!wait) throw error
-			const seconds = waitSeconds(wait)
-			if (wait > MAX_WAIT_MS) {
-				setStatus(
-					'error',
-					`Discord is limiting deletes. Try again in ${seconds} s.`,
-				)
-				notify(`Rate limited. Try again in ${seconds} s.`, 'critical')
-				return
-			}
-			setStatus('working', `Discord is limiting deletes. Waiting ${seconds} s.`)
-			notify(`Rate limited. Waiting ${seconds} s.`, 'default')
-			await sleep(wait)
-			if (disposed) {
-				setStatus('error', 'Stopped before the delete finished.')
-				return
-			}
-			await api.deleteMessage(channelId, messageId)
-		}
-		setStatus('ok', 'Your message was deleted.')
-		notify('Message deleted.', 'success')
-		logger?.log?.('[Message Deleter] one message deleted')
+		await api.deleteMessage(channelId, messageId)
 	} catch (error) {
-		if (isGone(error)) {
-			setStatus('ok', 'That message was already gone.')
-			notify('That message was already gone.', 'success')
-			return
+		const wait = rateLimitWait(error)
+		if (!wait) throw error
+		if (wait > MAX_WAIT_MS) {
+			const seconds = waitSeconds(wait)
+			throw new Error(`Discord is limiting deletes. Try again in ${seconds} s.`)
 		}
-		const reason = reasonFor(error)
-		setStatus('error', `Could not delete the message. ${reason}`)
-		notify(`Could not delete: ${reason}`, 'critical')
-		logger?.warn?.('[Message Deleter] delete refused', error)
-	} finally {
-		busy = false
+		await sleep(wait)
+		if (disposed) throw new Error('the plugin was stopped')
+		await api.deleteMessage(channelId, messageId)
 	}
 }
 
-function askToDelete(message: MessageLike, channel: ChannelLike): void {
+// ─── The chat's messages ─────────────────────────────────────────────────────
+
+function toArray(value: unknown): unknown[] {
+	if (Array.isArray(value)) return value
+	const record = asRecord(value)
+	const toArrayFn = record.toArray
+	if (typeof toArrayFn === 'function') {
+		try {
+			const out = (toArrayFn as () => unknown)()
+			return Array.isArray(out) ? out : []
+		} catch {}
+	}
+	return []
+}
+
+function asMessage(value: unknown): MessageLike | null {
+	const record = asRecord(value)
+	if (typeof record.id !== 'string' || !record.id) return null
+	const author = asRecord(record.author)
+	const message: MessageLike = {
+		id: record.id,
+		content: typeof record.content === 'string' ? record.content : '',
+		timestamp: typeof record.timestamp === 'string' ? record.timestamp : '',
+		author: {
+			id: typeof author.id === 'string' ? author.id : '',
+			username: typeof author.username === 'string' ? author.username : '',
+			globalName:
+				typeof author.globalName === 'string'
+					? author.globalName
+					: typeof author.global_name === 'string'
+						? author.global_name
+						: '',
+		},
+		attachments: Array.isArray(record.attachments) ? record.attachments : [],
+		embeds: Array.isArray(record.embeds) ? record.embeds : [],
+		deleted: record.deleted === true,
+		state: typeof record.state === 'string' ? record.state : undefined,
+	}
+	return message
+}
+
+function normalise(value: unknown): MessageLike[] {
+	const out: MessageLike[] = []
+	for (const raw of toArray(value)) {
+		const message = asMessage(raw)
+		if (message) out.push(message)
+	}
+	return out
+}
+
+// What the client already holds for the chat. No network call, so the list
+// appears instantly and works offline.
+function loadedMessages(channelId: string): MessageLike[] {
+	try {
+		const [module] = lookupModule(withProps('getMessages')) as [
+			unknown,
+			unknown,
+		]
+		const getMessages = asRecord(module).getMessages
+		if (typeof getMessages === 'function') {
+			const messages = normalise(
+				(getMessages as (id: string) => unknown)(channelId),
+			)
+			if (messages.length) diagnostics.history = 'cached messages'
+			return messages
+		}
+	} catch {}
+	return []
+}
+
+// Discord's own fetch action, when the build has one. It goes through the
+// client's auth and rate limiter, exactly like scrolling the chat.
+async function fetchMessages(channelId: string): Promise<MessageLike[]> {
+	try {
+		const [module] = lookupModule(withProps('fetchMessages')) as [
+			unknown,
+			unknown,
+		]
+		const fetch = asRecord(module).fetchMessages
+		if (typeof fetch !== 'function') return []
+		const call = fetch as (args: unknown, limit?: number) => unknown
+		let raw: unknown
+		try {
+			raw = await call({ channelId, limit: PAGE_LIMIT })
+		} catch {
+			raw = await call(channelId, PAGE_LIMIT)
+		}
+		const messages = normalise(raw)
+		if (messages.length) diagnostics.history = 'fetchMessages'
+		return messages
+	} catch {
+		return []
+	}
+}
+
+// ─── Deleting a selection ────────────────────────────────────────────────────
+
+interface BatchHooks {
+	onProgress(text: string): void
+	onDone(text: string, deleted: number, failed: boolean): void
+}
+
+function cancelBatch(): void {
+	batchCancelled = true
+}
+
+// Sequential on purpose: one request at a time, so the client's rate limiter
+// sees each delete, and a limit stops the run instead of hammering it.
+async function deleteBatch(
+	channelId: string,
+	ids: string[],
+	hooks: BatchHooks,
+): Promise<void> {
+	if (batchRunning || ids.length === 0) return
+	batchRunning = true
+	batchCancelled = false
+	let deleted = 0
+	let failure = ''
+	try {
+		for (let index = 0; index < ids.length; index++) {
+			if (batchCancelled || disposed) break
+			hooks.onProgress(`Deleting ${index + 1} of ${ids.length}…`)
+			try {
+				await deleteWithRetry(channelId, ids[index])
+				deleted++
+			} catch (error) {
+				if (isGone(error)) {
+					deleted++
+					continue
+				}
+				failure = reasonFor(error)
+				break
+			}
+		}
+	} finally {
+		batchRunning = false
+	}
+
+	const left = ids.length - deleted
+	const stopped = batchCancelled
+	if (failure) {
+		setStatus('error', `Deleted ${deleted} of ${ids.length}. ${failure}`)
+		notify(`Deleted ${deleted} of ${ids.length}. ${failure}`, 'critical')
+	} else if (stopped && left > 0) {
+		setStatus('idle', `Stopped after ${deleted} of ${ids.length}.`)
+		notify(`Stopped after ${deleted}.`, 'default')
+	} else if (deleted === 1) {
+		setStatus('ok', 'One message deleted.')
+		notify('Message deleted.', 'success')
+	} else {
+		setStatus('ok', `${deleted} messages deleted.`)
+		notify(`${deleted} messages deleted.`, 'success')
+	}
+	logger?.log?.(`[Message Deleter] bulk run: ${deleted}/${ids.length}`)
+	hooks.onDone(
+		failure
+			? `Deleted ${deleted} of ${ids.length}. ${failure}`
+			: stopped && left > 0
+				? `Stopped after ${deleted} of ${ids.length}.`
+				: `${deleted} deleted.`,
+		deleted,
+		Boolean(failure),
+	)
+}
+
+// ─── Confirmation ────────────────────────────────────────────────────────────
+
+function askToDeleteOne(message: MessageLike, channel: ChannelLike): void {
 	const body = `“${previewOf(message)}”\n\nDeleting removes it for everyone and cannot be undone.`
 	try {
 		Alert.alert(
@@ -337,6 +532,73 @@ function askToDelete(message: MessageLike, channel: ChannelLike): void {
 	}
 }
 
+// Discord's own alert, so the confirmation looks like the rest of the client.
+// Builds without it fall back to the system alert.
+function askToDeleteMany(count: number, run: () => void): void {
+	const design = (Design ?? {}) as DesignShim
+	const Modal = design.AlertModal
+	const Action = design.AlertActionButton
+	const title =
+		count === 1 ? 'Delete this message?' : `Delete ${count} messages?`
+	const content = 'They are removed for everyone and this cannot be undone.'
+	if (typeof Modal === 'function' && typeof Action === 'function') {
+		try {
+			AlertActionCreators.openAlert(
+				'message-deleter-bulk',
+				<Modal
+					title={title}
+					content={content}
+					actions={
+						<Action
+							text="Delete"
+							variant="danger"
+							onPress={() => {
+								run()
+							}}
+						/>
+					}
+				/>,
+			)
+			return
+		} catch {}
+	}
+	try {
+		Alert.alert(title, content, [
+			{ text: 'Cancel', style: 'cancel' },
+			{ text: 'Delete', style: 'destructive', onPress: run },
+		])
+	} catch {}
+}
+
+async function deleteOne(
+	message: MessageLike,
+	channel: ChannelLike,
+): Promise<void> {
+	const channelId = typeof channel.id === 'string' ? channel.id : ''
+	const messageId = typeof message.id === 'string' ? message.id : ''
+	if (!channelId || !messageId || busy) return
+	busy = true
+	setStatus('working', 'Deleting the message…')
+	try {
+		await deleteWithRetry(channelId, messageId)
+		setStatus('ok', 'Your message was deleted.')
+		notify('Message deleted.', 'success')
+		logger?.log?.('[Message Deleter] one message deleted')
+	} catch (error) {
+		if (isGone(error)) {
+			setStatus('ok', 'That message was already gone.')
+			notify('That message was already gone.', 'success')
+			return
+		}
+		const reason = reasonFor(error)
+		setStatus('error', `Could not delete the message. ${reason}`)
+		notify(`Could not delete: ${reason}`, 'critical')
+		logger?.warn?.('[Message Deleter] delete refused', error)
+	} finally {
+		busy = false
+	}
+}
+
 function requestDelete(message: MessageLike, channel: ChannelLike): void {
 	if (pending || busy) return
 	pending = true
@@ -349,10 +611,260 @@ function requestDelete(message: MessageLike, channel: ChannelLike): void {
 			pending = false
 			return
 		}
-		askToDelete(message, channel)
+		askToDeleteOne(message, channel)
 	}, CONFIRM_DELAY_MS)
 	timers.add(timer)
 }
+
+// ─── The message list ────────────────────────────────────────────────────────
+
+interface BulkSheetProps {
+	design: DesignShim
+}
+
+// The Discrub layout, drawn with Discord's own rows: one row per message with a
+// checkbox, a select-all switch, a live count, and a red delete row. It only
+// ever offers the account's own messages, because Discord will not let it
+// delete anybody else's in a DM.
+function BulkSheet({ design }: BulkSheetProps): unknown {
+	const Group = design.TableRowGroup
+	const Row = design.TableRow
+	const SwitchRow = design.TableSwitchRow
+	const CheckRow = design.TableCheckboxRow
+	const channelId =
+		typeof sheetState?.channel.id === 'string' ? sheetState.channel.id : ''
+
+	const cached = (() => {
+		try {
+			return loadedMessages(channelId)
+		} catch {
+			return []
+		}
+	})()
+
+	const [messages, setMessages] = useState(cached) as [
+		MessageLike[],
+		(next: MessageLike[] | ((prev: MessageLike[]) => MessageLike[])) => void,
+	]
+	const [selected, setSelected] = useState({}) as [
+		Record<string, boolean>,
+		(
+			next:
+				| Record<string, boolean>
+				| ((prev: Record<string, boolean>) => Record<string, boolean>),
+		) => void,
+	]
+	const [note, setNote] = useState(
+		cached.length ? '' : 'Reading this chat…',
+	) as [string, (next: string | ((prev: string) => string)) => void]
+	const [progress, setProgress] = useState('') as [
+		string,
+		(next: string | ((prev: string) => string)) => void,
+	]
+
+	useEffect(() => {
+		if (cached.length || !channelId) return
+		let live = true
+		void (async () => {
+			const fetched = await fetchMessages(channelId)
+			if (!live) return
+			if (fetched.length) {
+				setMessages(fetched)
+				setNote('')
+			} else {
+				setNote(
+					'This build does not expose the chat’s messages. Scroll the chat and try again.',
+				)
+			}
+		})()
+		return () => {
+			live = false
+		}
+	}, [])
+
+	const count = messages.length
+	const chosen = messages.filter(message => selected[message.id ?? ''])
+	const allChosen = count > 0 && chosen.length === count
+	const running = batchRunning
+
+	const toggle = (id: string): void => {
+		setSelected(previous => {
+			const next = { ...previous }
+			if (next[id]) delete next[id]
+			else next[id] = true
+			return next
+		})
+	}
+
+	const chooseAll = (value: boolean): void => {
+		if (!value) {
+			setSelected({})
+			return
+		}
+		const next: Record<string, boolean> = {}
+		for (const message of messages) {
+			if (message.id) next[message.id] = true
+		}
+		setSelected(next)
+	}
+
+	const run = (): void => {
+		if (running || chosen.length === 0) return
+		const ids = chosen
+			.map(message => (typeof message.id === 'string' ? message.id : ''))
+			.filter(Boolean)
+		askToDeleteMany(ids.length, () => {
+			void deleteBatch(channelId, ids, {
+				onProgress: text => {
+					setProgress(text)
+				},
+				onDone: text => {
+					setProgress('')
+					setNote(text)
+					setSelected({})
+				},
+			})
+		})
+	}
+
+	const stop = (): void => {
+		cancelBatch()
+		setProgress('')
+	}
+
+	const summary =
+		count === 0
+			? note || 'No messages to show.'
+			: `${chosen.length} of ${count} selected`
+
+	if (typeof Group !== 'function' || typeof Row !== 'function') {
+		return (
+			<ScrollView style={settingsScroll}>
+				<BodyText text="This build does not expose the rows the message list needs." />
+			</ScrollView>
+		)
+	}
+
+	return (
+		<ScrollView style={settingsScroll}>
+			<Group
+				title="Delete messages"
+				description="Only your own messages in this chat are offered. Deleting cannot be undone."
+			>
+				{SwitchRow ? (
+					<SwitchRow
+						label="Select all"
+						subLabel={`${count} message${count === 1 ? '' : 's'} listed`}
+						value={allChosen}
+						onValueChange={chooseAll}
+					/>
+				) : null}
+				{count === 0 ? (
+					<Row label="Nothing listed" subLabel={summary} />
+				) : (
+					messages.map(message => {
+						const id = message.id ?? ''
+						const label = `${authorOf(message)} · ${timeOf(message) || 'no time'}`
+						if (CheckRow) {
+							return (
+								<CheckRow
+									key={id}
+									value={id}
+									label={label}
+									subLabel={previewOf(message)}
+									checked={selected[id] === true}
+									onPress={() => toggle(id)}
+								/>
+							)
+						}
+						return (
+							<Row
+								key={id}
+								label={label}
+								subLabel={previewOf(message)}
+								arrow={false}
+								onPress={() => toggle(id)}
+							/>
+						)
+					})
+				)}
+			</Group>
+			<Group title={progress || summary}>
+				<Row
+					label={
+						running
+							? 'Deleting…'
+							: chosen.length === 1
+								? 'Delete 1 message'
+								: `Delete ${chosen.length} messages`
+					}
+					subLabel={
+						running
+							? 'One request at a time, within Discord’s limits.'
+							: 'Asks for a confirmation first.'
+					}
+					variant="danger"
+					disabled={running || chosen.length === 0}
+					onPress={run}
+				/>
+				<Row
+					label={running ? 'Stop deleting' : 'Close'}
+					subLabel={
+						running ? 'Finishes the message already being deleted.' : undefined
+					}
+					onPress={() => {
+						if (running) stop()
+						try {
+							ActionSheetActionCreators.hideActionSheet()
+						} catch {}
+					}}
+				/>
+			</Group>
+		</ScrollView>
+	)
+}
+
+function openBulkSheet(channel: ChannelLike, anchor: MessageLike): void {
+	if (!channel || typeof channel.id !== 'string') return
+	sheetState = { channel, anchor }
+	try {
+		ActionSheetActionCreators.hideActionSheet()
+	} catch {}
+	const timer = setTimeout(() => {
+		timers.delete(timer)
+		if (disposed) return
+		const design = (Design ?? {}) as DesignShim
+		if (
+			typeof design.TableRowGroup !== 'function' ||
+			typeof design.TableRow !== 'function'
+		) {
+			diagnostics.note = 'this build does not expose the rows the list needs'
+			notify('This build cannot show the message list.', 'critical')
+			return
+		}
+		try {
+			const creators = ActionSheetActionCreators as unknown as {
+				openLazy?: (module: Promise<unknown>, key: string) => void
+			}
+			if (typeof creators.openLazy !== 'function') {
+				notify('This build cannot open the message list.', 'critical')
+				return
+			}
+			const Sheet = (): unknown => <BulkSheet design={design} />
+			creators.openLazy(
+				Promise.resolve({ default: Sheet }),
+				'message-deleter-list',
+			)
+		} catch (error) {
+			diagnostics.note = `the message list could not open: ${errorMessage(error)}`
+			logger?.warn?.('[Message Deleter] list failed', error)
+			notify('The message list could not open.', 'critical')
+		}
+	}, CONFIRM_DELAY_MS)
+	timers.add(timer)
+}
+
+// ─── The long-press menu ─────────────────────────────────────────────────────
 
 interface ElementLike {
 	type?: unknown
@@ -389,15 +901,15 @@ function findActionSheet(
 	return findActionSheet(element.props?.children, marker, seen, depth + 1)
 }
 
-function appendRow(
+function appendRows(
 	tree: unknown,
-	row: unknown,
+	rows: unknown[],
 	marker: DesignComponent,
 ): boolean {
 	const sheet = findActionSheet(tree, marker)
 	if (!sheet?.props) return false
 	const children = [sheet.props.children].flat().filter(Boolean)
-	sheet.props.children = [...children, row]
+	sheet.props.children = [...children, ...rows]
 	return true
 }
 
@@ -409,9 +921,9 @@ function iconFor(name: string): unknown {
 	}
 }
 
-// Adds one row to Discord's long-press menu, and only while that menu is open
-// on a message this account may delete. Every part is looked up at render time
-// and every failure returns the original tree, so the menu cannot break.
+// Adds the rows to Discord's long-press menu, and only while that menu is open
+// on a DM. Every part is looked up at render time and every failure returns the
+// original tree, so the menu cannot break.
 function patchSheet(): () => void {
 	const design = (Design ?? {}) as DesignLike
 	const Sheet = design.ActionSheet
@@ -428,6 +940,7 @@ function patchSheet(): () => void {
 		return () => {}
 	}
 	const trashIcon = iconFor('TrashIcon')
+	const listIcon = iconFor('ListIcon') ?? trashIcon
 	let unpatch: (() => void) | undefined
 
 	const unsubscribe = getModules(
@@ -444,20 +957,41 @@ function patchSheet(): () => void {
 					const props = asRecord(args[0]) as unknown as SheetProps
 					const message = props.message
 					const channel = props.channel
-					if (!message || !channel || !eligible(message, channel)) return tree
-					const row = (
-						<Group>
-							<Row
-								label="Delete message"
-								variant="danger"
-								icon={
-									trashIcon ? <RowIcon IconComponent={trashIcon} /> : undefined
-								}
-								onPress={() => requestDelete(message, channel)}
-							/>
-						</Group>
-					)
-					if (!appendRow(tree, row, Sheet)) {
+					if (!message || !channel) return tree
+					const isMine = eligible(message, channel)
+					const inDm = channel.type === DM || channel.type === GROUP_DM
+					if (!isMine && !inDm) return tree
+					const rows: unknown[] = []
+					if (isMine) {
+						rows.push(
+							<Group key="message-deleter-one">
+								<Row
+									label="Delete message"
+									variant="danger"
+									icon={
+										trashIcon ? (
+											<RowIcon IconComponent={trashIcon} />
+										) : undefined
+									}
+									onPress={() => requestDelete(message, channel)}
+								/>
+							</Group>,
+						)
+					}
+					if (inDm) {
+						rows.push(
+							<Group key="message-deleter-many">
+								<Row
+									label="Delete messages in this chat…"
+									icon={
+										listIcon ? <RowIcon IconComponent={listIcon} /> : undefined
+									}
+									onPress={() => openBulkSheet(channel, message)}
+								/>
+							</Group>,
+						)
+					}
+					if (!appendRows(tree, rows, Sheet)) {
 						diagnostics.note = 'the message menu could not be extended'
 						return tree
 					}
@@ -482,6 +1016,25 @@ function patchSheet(): () => void {
 	}
 }
 
+// ─── Settings page ───────────────────────────────────────────────────────────
+
+// Body copy is drawn by Discord whenever it can be: the client owns the colour
+// and the type scale, so it reads on every theme. Only a build without the
+// design system falls back to React Native text, and that path always sets an
+// explicit colour — uncoloured text is black, which is invisible on dark.
+function BodyText({ text }: { text: string }): unknown {
+	const design = (Design ?? {}) as DesignShim
+	const DText = design.Text
+	if (typeof DText === 'function') {
+		return <DText variant="text-sm/medium">{text}</DText>
+	}
+	return (
+		<Text style={{ color: readableText(), fontSize: 15, lineHeight: 21 }}>
+			{text}
+		</Text>
+	)
+}
+
 export default plugin({
 	start({
 		cleanup,
@@ -492,56 +1045,91 @@ export default plugin({
 	}) {
 		logger = pluginLogger
 		disposed = false
+		batchRunning = false
+		batchCancelled = false
 		cleanup(patchSheet())
 		resolveActions()
 		logger?.log?.('[Message Deleter] ready')
 	},
 	stop() {
 		disposed = true
+		cancelBatch()
 		for (const timer of timers) clearTimeout(timer)
 		timers.clear()
 		pending = false
 		busy = false
+		sheetState = null
 	},
 	SettingsComponent() {
 		const design = (Design ?? {}) as DesignShim
 		const Group = design.TableRowGroup
 		const Row = design.TableRow
-		const muted = token('TEXT_MUTED')
-		const normal = token('TEXT_NORMAL')
 		const danger = token('TEXT_DANGER')
-		const statusText = status.text || 'Nothing deleted yet.'
-		const menuText = diagnostics.sheet
-			? 'Ready. The action is in the long-press menu.'
+		const result = status.text || 'Nothing deleted yet.'
+		const menu = diagnostics.sheet
+			? 'Ready. The rows are in the long-press menu.'
 			: diagnostics.note || 'Waiting for the message menu to load.'
+		const list = diagnostics.history
+			? `Reading messages with ${diagnostics.history}.`
+			: 'Not read yet. Open the list in a chat to find out.'
+		const action = diagnostics.actions
+			? 'Discord’s own delete action was found.'
+			: 'Not found yet.'
 
-		if (typeof Group !== 'function' || typeof Row !== 'function') {
+		if (typeof Group === 'function' && typeof Row === 'function') {
 			return (
 				<ScrollView style={settingsScroll}>
-					<Text style={{ color: normal }}>
-						Message Deleter needs the settings rows this build does not have.
-					</Text>
-					<Text style={{ color: muted, marginTop: 8 }}>{statusText}</Text>
+					<Group
+						title="Message Deleter"
+						description="Delete your own messages in a DM, one at a time or from the chat’s list."
+					>
+						<Row
+							label="Delete one message"
+							subLabel="Hold a message you sent, then choose Delete message."
+						/>
+						<Row
+							label="Delete several"
+							subLabel="Hold any message, then choose Delete messages in this chat…"
+						/>
+						<Row
+							label="Nothing runs on its own"
+							subLabel="No background cleanup and no queue: only what you confirm."
+						/>
+					</Group>
+					<Group title="Last result">
+						<Row label="Status" subLabel={result} />
+					</Group>
+					<Group title="Diagnostics">
+						<Row label="Message menu" subLabel={menu} />
+						<Row label="Delete action" subLabel={action} />
+						<Row label="Message list" subLabel={list} />
+					</Group>
+					<Group
+						title="Careful"
+						description="Deleting removes a message for everyone and cannot be undone."
+					>
+						<Row label="Deleting cannot be undone" variant="danger" />
+					</Group>
 				</ScrollView>
 			)
 		}
 
+		// Builds without the design rows still get a readable page.
 		return (
 			<ScrollView style={settingsScroll}>
-				<Group title="Message Deleter">
-					<Row
-						label="Delete a message"
-						subLabel="Hold a message you sent in a DM, then choose Delete message."
-					/>
-					<Row label="Last result" subLabel={statusText} />
-					<Row label="Message menu" subLabel={menuText} />
-				</Group>
-				<Text style={{ color: muted }}>
-					Only your own messages in DMs are offered, one at a time. Deleting
-					uses Discord's own delete action; nothing is scraped, queued, or
-					cleaned up in the background.
-				</Text>
-				<Text style={{ color: danger, marginTop: 8 }}>
+				<BodyText text="Message Deleter" />
+				<BodyText text="Hold a message you sent in a DM, then choose Delete message. Hold any message and choose Delete messages in this chat to pick several." />
+				<BodyText text={result} />
+				<BodyText text={menu} />
+				<BodyText text={action} />
+				<BodyText text={list} />
+				<Text
+					style={{
+						color: danger ?? readableText(),
+						fontSize: 15,
+						lineHeight: 21,
+					}}
+				>
 					Deleting cannot be undone.
 				</Text>
 			</ScrollView>

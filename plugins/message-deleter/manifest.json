@@ -2,10 +2,10 @@
 	"format": 1,
 	"id": "dev.8uvu.dm-deleter",
 	"name": "Message Deleter",
-	"description": "Hold a message you sent in a DM and delete that one message, after a confirmation with a preview. Nothing else is touched.",
+	"description": "Delete your own messages in a DM: hold one message, or open the chat's list and pick several. Every delete asks first and respects Discord's limits.",
 	"author": "cenotaph",
 	"icon": "TrashIcon",
-	"version": "2.0.0",
+	"version": "2.1.0",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"

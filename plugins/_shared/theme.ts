@@ -5,23 +5,70 @@
 // least two of them. `token` reads Discord's own semantic colour for the
 // appearance that is active right now.
 //
-// Nothing here hardcodes a colour: the value comes from Discord's token module.
-// When that module is not reachable (a unit-test harness, or a build that
-// renamed it) the lookup returns undefined and the platform's default colour
-// applies, which is always legible.
+// The base comes from Discord's own theme when the tokens module exposes it.
+// `Appearance.getColorScheme()` is the phone's light/dark setting, not the
+// client's theme, so it is only a fallback: resolving against it puts
+// dark-theme colours on a light page whenever the two disagree.
 import { Tokens } from '@valenced/discord/common/tokens'
 import { Appearance } from 'react-native'
 
-type Appearance2 = 'dark' | 'light'
+// Only used when Discord's token module cannot be reached at all (a harness, or
+// a build that renamed it). Without a colour React Native draws black text,
+// which is invisible on Discord's dark theme; with it the page stays readable.
+const READABLE_FALLBACK = '#dbdee1'
 
-// Discord's bases: `darker` is the "Dark" option, `midnight` the AMOLED one.
+function recordOf(value: unknown): Record<string, unknown> {
+	return typeof value === 'object' && value !== null
+		? (value as Record<string, unknown>)
+		: {}
+}
+
+// Discord's four bases: Ash is `dark`, Dark is `darker`, Light is `light`, and
+// Onyx (the AMOLED theme) is `midnight`.
+function baseFromTheme(value: unknown): string | null {
+	let name = typeof value === 'string' ? value : ''
+	if (!name) {
+		const record = recordOf(value)
+		if (typeof record.theme === 'string') name = record.theme
+		else if (typeof record.name === 'string') name = record.name
+	}
+	switch (name.toLowerCase()) {
+		case 'light':
+			return 'light'
+		case 'dark':
+		case 'darker':
+			return 'darker'
+		case 'ash':
+			return 'dark'
+		case 'midnight':
+		case 'onyx':
+			return 'midnight'
+		default:
+			return null
+	}
+}
+
 function activeBase(): string {
+	try {
+		const tokens = recordOf(Tokens)
+		const root = recordOf(tokens.default)
+		const internal = recordOf(root.internal)
+		const getTheme = internal.getTheme
+		const theme =
+			typeof getTheme === 'function'
+				? (getTheme as () => unknown)()
+				: (root.theme ?? internal.currentTheme ?? internal.theme)
+		const base = baseFromTheme(theme)
+		if (base) return base
+	} catch {
+		// Fall through to the phone's appearance.
+	}
 	try {
 		if (Appearance?.getColorScheme?.() === 'light') return 'light'
 	} catch {
 		// Fall through to the dark base.
 	}
-	return 'dark'
+	return 'darker'
 }
 
 export function token(name: string): string | undefined {
@@ -43,6 +90,11 @@ export function token(name: string): string | undefined {
 		// A missing or renamed token must not take a settings page down.
 	}
 	return undefined
+}
+
+// Body text: never returns nothing, because an unset colour means black text.
+export function readableText(name = 'TEXT_NORMAL'): string {
+	return token(name) ?? token('TEXT_NORMAL') ?? READABLE_FALLBACK
 }
 
 // A few names read better at the call site than at the token module.

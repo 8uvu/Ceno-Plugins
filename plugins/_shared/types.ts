@@ -185,6 +185,7 @@ export interface DesignShim {
 	TableRowGroup?: DesignComponent
 	TableRow?: DesignComponent
 	TableSwitchRow?: DesignComponent
+	TableCheckboxRow?: DesignComponent
 	TableRadioGroup?: DesignComponent
 	TableRadioRow?: DesignComponent
 	AlertModal?: DesignComponent
