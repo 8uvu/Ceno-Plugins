@@ -1,6 +1,6 @@
 // TypingWatch, by cenotaph. Keeps the last few typing indicators you missed.
 import { Design } from '@valenced/discord/design'
-import { onFluxEventDispatched } from '@valenced/discord/flux'
+import { onFluxEventDispatched, Stores } from '@valenced/discord/flux'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { token } from '../../_shared/theme'
 import type { DesignShim, JsonStorage } from '../../_shared/types'
@@ -39,6 +39,58 @@ export function remember(recent: Entry[], entry: Entry): Entry[] {
 			!(item?.channelId === entry.channelId && item?.userId === entry.userId),
 	)
 	return [entry, ...rest].slice(0, KEEP)
+}
+
+// The list reads as names, not snowflakes: the stores are asked at draw time and
+// an id stays the fallback, so a missing store never blanks a row.
+function storeNamed(name: string): Record<string, unknown> | null {
+	try {
+		const found = (Stores as unknown as Record<string, unknown>)[name]
+		return found && typeof found === 'object'
+			? (found as Record<string, unknown>)
+			: null
+	} catch {
+		return null
+	}
+}
+
+function userName(id: string): string {
+	const lookup = storeNamed('UserStore')?.getUser
+	if (typeof lookup !== 'function') return id
+	try {
+		const user = (lookup as (id: string) => unknown)(id)
+		const record =
+			user && typeof user === 'object' ? (user as Record<string, unknown>) : {}
+		const name = record.globalName ?? record.username
+		return typeof name === 'string' && name ? name : id
+	} catch {
+		return id
+	}
+}
+
+function channelName(id: string): string {
+	const lookup = storeNamed('ChannelStore')?.getChannel
+	if (typeof lookup !== 'function') return id
+	try {
+		const channel = (lookup as (id: string) => unknown)(id)
+		const record =
+			channel && typeof channel === 'object'
+				? (channel as Record<string, unknown>)
+				: {}
+		if (typeof record.name === 'string' && record.name) return '#' + record.name
+		const recipients = Array.isArray(record.recipients) ? record.recipients : []
+		const other = recipients[0]
+		if (other && typeof other === 'object') {
+			const person = other as Record<string, unknown>
+			const name = person.globalName ?? person.username
+			if (typeof name === 'string' && name) return name
+		}
+	} catch {}
+	return id
+}
+
+function labelOf(entry: Entry): string {
+	return userName(entry.userId) + ' in ' + channelName(entry.channelId)
 }
 
 export default plugin<{ jsonStorage: Settings }>({
@@ -114,7 +166,7 @@ export default plugin<{ jsonStorage: Settings }>({
 							: recent.map((entry: Entry) =>
 									row(
 										entry.channelId + ':' + entry.userId,
-										entry.userId + ' in ' + entry.channelId,
+										labelOf(entry),
 										ago(entry.at, now),
 									),
 								)}
@@ -161,11 +213,7 @@ export default plugin<{ jsonStorage: Settings }>({
 							key={entry.channelId + ':' + entry.userId}
 							style={{ color: token('TEXT_NORMAL') }}
 						>
-							{entry.userId +
-								' in ' +
-								entry.channelId +
-								' — ' +
-								ago(entry.at, now)}
+							{labelOf(entry) + ' — ' + ago(entry.at, now)}
 						</Text>
 					))
 				)}

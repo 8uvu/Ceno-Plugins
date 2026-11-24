@@ -4,7 +4,12 @@
 const { createSandbox, loadBundle, textOf, tick } = require('../../scripts/valenced-harness.cjs');
 
 async function main() {
-    const sandbox = createSandbox();
+    const sandbox = createSandbox({
+        stores: {
+            UserStore: { getUser: (id) => ({ id, username: id === 'user1' ? 'ada' : 'bo' }) },
+            ChannelStore: { getChannel: (id) => (id === 'chan1' ? { id, name: 'general' } : null) },
+        },
+    });
     const inst = loadBundle('dev.8uvu.typing-watch', sandbox);
     await inst.start(sandbox.api);
     await tick();
@@ -30,7 +35,7 @@ async function main() {
 
     const ui = inst.SettingsComponent({ api: sandbox.api });
     const text = textOf(ui);
-    for (const expected of ['TypingWatch', 'Remember who types', 'user1 in chan1']) {
+    for (const expected of ['TypingWatch', 'Remember who types', 'ada in #general']) {
         if (!text.includes(expected)) throw new Error('settings UI missing: ' + expected);
     }
 
