@@ -5,7 +5,7 @@
 	"description": "Delete your own messages in a DM: hold one message, or open the chat's list and pick several. Every delete asks first and respects Discord's limits.",
 	"author": "cenotaph",
 	"icon": "TrashIcon",
-	"version": "2.1.2",
+	"version": "2.1.3",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"

@@ -118,7 +118,6 @@ interface Diagnostics {
 
 interface SheetState {
 	channel: ChannelLike
-	anchor?: MessageLike
 }
 
 let logger: Logger | undefined
@@ -633,13 +632,16 @@ function requestDelete(message: MessageLike, channel: ChannelLike): void {
 
 interface BulkSheetProps {
 	design: DesignShim
+	// In the alert modal the alert's own button closes it, so a Close row there
+	// would do nothing; the Stop row still belongs while a run is going.
+	inAlert?: boolean
 }
 
 // The Discrub layout, drawn with Discord's own rows: one row per message with a
 // checkbox, a select-all switch, a live count, and a red delete row. It only
 // ever offers the account's own messages, because Discord will not let it
 // delete anybody else's in a DM.
-function BulkSheet({ design }: BulkSheetProps): unknown {
+function BulkSheet({ design, inAlert }: BulkSheetProps): unknown {
 	const Group = design.TableRowGroup
 	const Row = design.TableRow
 	const SwitchRow = design.TableSwitchRow
@@ -823,66 +825,90 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 					disabled={running || chosen.length === 0}
 					onPress={run}
 				/>
-				<Row
-					label={running ? 'Stop deleting' : 'Close'}
-					subLabel={
-						running ? 'Finishes the message already being deleted.' : undefined
-					}
-					onPress={() => {
-						if (running) stop()
-						try {
-							ActionSheetActionCreators.hideActionSheet()
-						} catch {}
-					}}
-				/>
+				{(running || !inAlert) && (
+					<Row
+						label={running ? 'Stop deleting' : 'Close'}
+						subLabel={
+							running
+								? 'Finishes the message already being deleted.'
+								: undefined
+						}
+						onPress={() => {
+							if (running) stop()
+							try {
+								ActionSheetActionCreators.hideActionSheet()
+							} catch {}
+						}}
+					/>
+				)}
 			</Group>
 		</ScrollView>
 	)
 }
 
-// Discord's sheet action takes the component to show, and its own builds have
-// taken it two ways: a promise of the module, or a function that returns one.
-// This is both, so the list opens on either without guessing the build first.
-const SHEET_KEY = 'message-deleter-list'
+const LIST_KEY = 'message-deleter-list'
 
 interface LazySheetModule {
 	default: () => unknown
 }
 
-// Returns why the sheet did not open, or an empty string when it did. Discord's
-// action has taken the component three ways across builds, so each is tried in
-// turn: the promise of the module (what the docs describe), a function that
-// returns it, and the key first. Whichever the build wants, it is the first one
-// that does not throw.
-function openSheet(Sheet: () => unknown): string {
+// The list in Discord's action sheet. Builds have taken the module either as a
+// promise or as a function that returns one, so both are tried; the reason is
+// returned when neither is accepted, and an empty string when the sheet opened.
+function openInSheet(Sheet: () => unknown): string {
 	const creators = ActionSheetActionCreators as unknown as {
 		openLazy?: unknown
 	}
 	const open = creators?.openLazy
-	if (typeof open !== 'function') return 'this build cannot open a sheet'
+	if (typeof open !== 'function') return 'this build has no sheet action'
 	const call = open as (first: unknown, second: unknown) => void
 	const load = (): Promise<LazySheetModule> =>
 		Promise.resolve({ default: Sheet })
-	const attempts: Array<() => void> = [
-		() => call(load(), SHEET_KEY),
-		() => call(load, SHEET_KEY),
-		() => call(SHEET_KEY, load),
-	]
-	let first: unknown
-	for (const attempt of attempts) {
+	let reason = 'the sheet action refused'
+	for (const attempt of [
+		() => call(load(), LIST_KEY),
+		() => call(load, LIST_KEY),
+	]) {
 		try {
 			attempt()
 			return ''
 		} catch (error) {
-			if (first === undefined) first = error
+			reason = errorMessage(error) || reason
 		}
 	}
-	return errorMessage(first) || 'the sheet action refused'
+	return reason
 }
 
-function openBulkSheet(channel: ChannelLike, anchor: MessageLike): void {
+// The fallback surface: Discord's alert modal, which does not go through the
+// sheet action at all. Returns whether it was opened.
+function openInAlert(design: DesignShim): boolean {
+	const Modal = design.AlertModal
+	const Action = design.AlertActionButton
+	const open = (AlertActionCreators as unknown as { openAlert?: unknown })
+		?.openAlert
+	if (typeof Modal !== 'function' || typeof open !== 'function') return false
+	const call = open as (key: string, element: unknown) => void
+	try {
+		call(
+			LIST_KEY,
+			<Modal
+				title="Delete messages"
+				content={<BulkSheet design={design} inAlert />}
+				actions={
+					typeof Action === 'function' ? <Action text="Close" /> : undefined
+				}
+			/>,
+		)
+		return true
+	} catch (error) {
+		logger?.warn?.('[Message Deleter] alert failed', error)
+		return false
+	}
+}
+
+function openBulkSheet(channel: ChannelLike): void {
 	if (!channel || typeof channel.id !== 'string') return
-	sheetState = { channel, anchor }
+	sheetState = { channel }
 	try {
 		ActionSheetActionCreators.hideActionSheet()
 	} catch {}
@@ -898,24 +924,50 @@ function openBulkSheet(channel: ChannelLike, anchor: MessageLike): void {
 			notify('This build cannot show the message list.', 'critical')
 			return
 		}
+		let problem = ''
 		try {
 			const Sheet = (): unknown => <BulkSheet design={design} />
-			const problem = openSheet(Sheet)
-			if (problem) {
-				diagnostics.note = `the message list could not open: ${problem}`
-				logger?.warn?.('[Message Deleter] list failed', problem)
-				notify(`The message list could not open: ${problem}`, 'critical')
-			}
+			problem = openInSheet(Sheet)
 		} catch (error) {
-			diagnostics.note = `the message list could not open: ${errorMessage(error)}`
-			logger?.warn?.('[Message Deleter] list failed', error)
-			notify(
-				`The message list could not open: ${errorMessage(error)}`,
-				'critical',
-			)
+			problem = errorMessage(error)
 		}
+		if (!problem) return
+		logger?.warn?.('[Message Deleter] sheet refused the list', problem)
+		if (openInAlert(design)) {
+			diagnostics.note = `the list is in an alert; the sheet refused: ${problem}`
+			return
+		}
+		diagnostics.note = `the message list could not open: ${problem}`
+		notify(`The message list could not open: ${problem}`, 'critical')
 	}, CONFIRM_DELAY_MS)
 	timers.add(timer)
+}
+
+// The direct route: every message this account sent in the chat, deleted in one
+// confirmed run. It needs no sheet, no list and no modal of ours, so it still
+// works on a build where the list cannot be shown at all.
+function deleteAllMine(channel: ChannelLike): void {
+	const channelId = typeof channel.id === 'string' ? channel.id : ''
+	if (!channelId || batchRunning) return
+	void (async () => {
+		const cached = ownMessages(loadedMessages(channelId))
+		const found = cached.length
+			? cached
+			: ownMessages(await fetchMessages(channelId))
+		const ids = found
+			.map(message => (typeof message.id === 'string' ? message.id : ''))
+			.filter(Boolean)
+		if (!ids.length) {
+			notify('You have not sent anything in this chat yet.', 'default')
+			return
+		}
+		askToDeleteMany(ids.length, () => {
+			void deleteBatch(channelId, ids, {
+				onProgress: text => setStatus('working', text),
+				onDone: () => {},
+			})
+		})
+	})()
 }
 
 // ─── The long-press menu ─────────────────────────────────────────────────────
@@ -1036,11 +1088,21 @@ function patchSheet(): () => void {
 						rows.push(
 							<Group key="message-deleter-many">
 								<Row
+									label="Delete all my messages"
+									variant="danger"
+									icon={
+										trashIcon ? (
+											<RowIcon IconComponent={trashIcon} />
+										) : undefined
+									}
+									onPress={() => deleteAllMine(channel)}
+								/>
+								<Row
 									label="Delete messages in this chat…"
 									icon={
 										listIcon ? <RowIcon IconComponent={listIcon} /> : undefined
 									}
-									onPress={() => openBulkSheet(channel, message)}
+									onPress={() => openBulkSheet(channel)}
 								/>
 							</Group>,
 						)
