@@ -175,6 +175,19 @@ function mine(message?: MessageLike): boolean {
 	return typeof message.author?.id === 'string' && message.author.id === me
 }
 
+// The list only offers what Discord will actually let this account delete: its
+// own messages, still there, and not one that is still sending. Anything else
+// would be a row that could only fail.
+function ownMessages(messages: MessageLike[]): MessageLike[] {
+	return messages.filter(
+		message =>
+			mine(message) &&
+			message.deleted !== true &&
+			message.state !== 'SENDING' &&
+			message.state !== 'FAILED',
+	)
+}
+
 // What a row or a confirmation shows: the message itself, shortened, or a plain
 // description when it has no text.
 function previewOf(message: MessageLike): string {
@@ -636,7 +649,7 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 
 	const cached = (() => {
 		try {
-			return loadedMessages(channelId)
+			return ownMessages(loadedMessages(channelId))
 		} catch {
 			return []
 		}
@@ -666,11 +679,14 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 		if (cached.length || !channelId) return
 		let live = true
 		void (async () => {
-			const fetched = await fetchMessages(channelId)
+			const all = await fetchMessages(channelId)
 			if (!live) return
+			const fetched = ownMessages(all)
 			if (fetched.length) {
 				setMessages(fetched)
 				setNote('')
+			} else if (all.length) {
+				setNote('You have not sent anything in this chat yet.')
 			} else {
 				setNote(
 					'This build does not expose the chat’s messages. Scroll the chat and try again.',
@@ -734,7 +750,7 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 
 	const summary =
 		count === 0
-			? note || 'No messages to show.'
+			? note || 'No messages from you in this chat.'
 			: `${chosen.length} of ${count} selected`
 
 	if (typeof Group !== 'function' || typeof Row !== 'function') {
@@ -749,7 +765,7 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 		<ScrollView style={settingsScroll}>
 			<Group
 				title="Delete messages"
-				description="Only your own messages in this chat are offered. Deleting cannot be undone."
+				description="Only the messages you sent are listed, and deleting cannot be undone."
 			>
 				{SwitchRow ? (
 					<SwitchRow
@@ -760,7 +776,7 @@ function BulkSheet({ design }: BulkSheetProps): unknown {
 					/>
 				) : null}
 				{count === 0 ? (
-					<Row label="Nothing listed" subLabel={summary} />
+					<Row label="Nothing of yours listed" subLabel={summary} />
 				) : (
 					messages.map(message => {
 						const id = message.id ?? ''
