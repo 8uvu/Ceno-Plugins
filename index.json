@@ -57,13 +57,26 @@
       "author": "cenotaph",
       "icon": "LinkIcon",
       "channels": {
-        "latest": "1.1.11"
+        "latest": "1.2.0"
       },
       "versions": {
         "1.1.11": {
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.clean-urls@1.1.11.zip",
           "sha256": "c3617e41ab4a1e5c5e278ab66b96d8ac03500b65dea2d8743948bba55067e738",
           "size": 4409,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.clean-urls@1.2.0.zip",
+          "sha256": "1f549d736d26129dcc0a65a6e940aaaab64ec6b8dab521516783c797fb6312a7",
+          "size": 3741,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -81,7 +94,7 @@
       "author": "cenotaph",
       "icon": "TrashIcon",
       "channels": {
-        "latest": "3.0.0"
+        "latest": "3.1.0"
       },
       "versions": {
         "1.0.0": {
@@ -213,6 +226,19 @@
               "version": "*"
             }
           }
+        },
+        "3.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dm-deleter@3.1.0.zip",
+          "sha256": "ab86a806328693bdd3bc6c3f8a4b3918f7326f267d7900fa1f4a4cba49de630d",
+          "size": 6332,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
         }
       }
     },
@@ -222,13 +248,26 @@
       "author": "cenotaph",
       "icon": "MicrophoneIcon",
       "channels": {
-        "latest": "1.1.8"
+        "latest": "1.2.0"
       },
       "versions": {
         "1.1.8": {
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.1.8.zip",
           "sha256": "821dc8b174057cd3f0617c005f0f0c5a94e124abc2ddbc2db8fe8bc7d7163695",
           "size": 5245,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.2.0.zip",
+          "sha256": "e710bf9a106a159f73aac5f44075a147a8c30985c77867274de694eebc26b145",
+          "size": 4124,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -294,13 +333,26 @@
       "author": "cenotaph",
       "icon": "ClockIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.later@1.0.0.zip",
           "sha256": "53e197cb38d9496fe248e473b150494072a83d78caefd2de0fe1cc79b1764005",
           "size": 3775,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.later@1.1.0.zip",
+          "sha256": "8d368ee1e1176b67aa3b1d8ed816eea0f6a84196a2e0b0291a18aaae286c6765",
+          "size": 4652,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -318,13 +370,26 @@
       "author": "cenotaph",
       "icon": "ListBulletsIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.message-logger@1.0.0.zip",
           "sha256": "e732044c7b06ac614d73e9a16dfd8d9f426500512287cba2254b8612bec9a0b7",
           "size": 3118,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.message-logger@1.1.0.zip",
+          "sha256": "b987011a51f2f19d01698c6499c7c6f2d607d6964d66a4249634a3fad1fc54fc",
+          "size": 4041,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -342,7 +407,7 @@
       "author": "cenotaph",
       "icon": "MessageIcon",
       "channels": {
-        "latest": "1.1.0"
+        "latest": "1.2.0"
       },
       "versions": {
         "1.0.0": {
@@ -370,6 +435,19 @@
               "version": "*"
             }
           }
+        },
+        "1.2.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.streaks@1.2.0.zip",
+          "sha256": "7ec79f91ef7f446540b2884ba20f70920c4bc508307570e476029fae1360f95b",
+          "size": 4942,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
         }
       }
     },
@@ -379,7 +457,7 @@
       "author": "cenotaph",
       "icon": "EyeIcon",
       "channels": {
-        "latest": "1.1.0"
+        "latest": "1.2.0"
       },
       "versions": {
         "1.0.12": {
@@ -399,6 +477,19 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.1.0.zip",
           "sha256": "edc0c526d0fb91896f8803e5965332a3c2aefa3fc279eed8aa99c8acaca289a6",
           "size": 2262,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.2.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.2.0.zip",
+          "sha256": "00516d1efa9696f5d2ebd279732641a9929a81facd49ae4f48f134f369e32848",
+          "size": 3270,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
@@ -440,13 +531,26 @@
       "author": "cenotaph",
       "icon": "EyeIcon",
       "channels": {
-        "latest": "1.0.0"
+        "latest": "1.1.0"
       },
       "versions": {
         "1.0.0": {
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.watchlist@1.0.0.zip",
           "sha256": "ca0ee936effc9e8faf83aa54b53fb0678f40e844b12f46da7cb1b0e4580e31a8",
           "size": 3565,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.1.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.watchlist@1.1.0.zip",
+          "sha256": "1991bcd55f15f8419b6ae2580bf5e13bd16c762c4517ed663a0b4224310dfb78",
+          "size": 4604,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
