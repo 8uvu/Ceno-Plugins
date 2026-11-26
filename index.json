@@ -3,6 +3,30 @@
   "name": "Ceno Plugins",
   "description": "Small Valenced plugins by cenotaph.",
   "plugins": {
+    "dev.8uvu.away": {
+      "name": "Away",
+      "description": "Answers your DMs while you are out: one short reply you wrote, at most once per chat every few hours, sent through Discord's own action. Off by default.",
+      "author": "cenotaph",
+      "icon": "ClockIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.away@1.0.0.zip",
+          "sha256": "f4f388cfa4b7a3beb4660aa78ff4645aa2fa464dfef62612e95675b03f4776b5",
+          "size": 4977,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "dev.8uvu.bookmarks": {
       "name": "Bookmarks",
       "description": "Hold any message and keep it on this device: the text, its author, the channel and the time. Nothing is uploaded and attachments are only named.",
@@ -375,6 +399,30 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.1.0.zip",
           "sha256": "edc0c526d0fb91896f8803e5965332a3c2aefa3fc279eed8aa99c8acaca289a6",
           "size": 2262,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.waiting-on-you": {
+      "name": "Waiting on You",
+      "description": "A local list of the DMs whose last message is theirs, oldest first. Send anything in a chat and it leaves the list. Nothing is uploaded.",
+      "author": "cenotaph",
+      "icon": "ChatMarkUnreadIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.waiting-on-you@1.0.0.zip",
+          "sha256": "5a61ab00b9b8c6f46c34a2ced5eb272ceee7b7fc9421187e819580ca2745e613",
+          "size": 4093,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
