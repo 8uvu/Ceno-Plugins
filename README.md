@@ -22,13 +22,11 @@ in the background.
 | --- | --- | --- |
 | **Watchlist** | Get a toast when someone you watch comes online, types to you, or sends a message. | 1.1.0 |
 | **Later** | Hold a message and be pinged about it in an hour, in three hours, or tomorrow. | 1.1.0 |
-| **Bookmarks** | Keep a message on this device: the text, its author, the channel and the time. | 1.0.0 |
 | **Keywords** | Get a toast when a message contains a word you follow. | 1.0.0 |
-| **Last Seen** | A local record of when people came online and went away. | 1.0.0 |
 | **Away** | Answers your DMs while you are out, with a reply you wrote. | 1.0.0 |
 | **Waiting on You** | The DMs whose last message is theirs, oldest first. | 1.0.0 |
 | **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.2.0 |
-| **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.2.0 |
+| **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.3.0 |
 
 ---
 
@@ -66,26 +64,6 @@ tomorrow — useful for the message you cannot deal with right now.
 **Settings page:** the switch, the waiting pings in order, and the row that
 cancels every one.
 
-## Bookmarks
-
-Hold a message and keep it. The text, who wrote it, the channel and the time stay
-on this device — useful for the link you will want later and the thing you cannot
-act on now.
-
-- **Save and unsave from the message menu.** Hold any message and pick *Save this
-  message*; the same row becomes *Remove this bookmark* afterwards.
-- **Kept as it was.** An edit or a deletion afterwards does not change what you
-  kept, because the text is copied when you save it.
-- **Attachments are named, never downloaded.** A bookmark of a picture says so; it
-  does not copy the file.
-- **500 bookmarks,** newest first, each with how long ago it was saved.
-- **Removing one asks first,** with the system dialog, so a tap while scrolling
-  cannot lose it. *Remove every bookmark* is one row.
-- **Nothing is uploaded.** No account, no server, no token.
-
-**Settings page:** the switch, the count, the clear-all row, what is kept, and the
-list — tap one to remove it.
-
 ## Keywords
 
 A watch on words rather than on people: when a message contains one, a toast says
@@ -101,22 +79,6 @@ which word, where, and who wrote it.
 
 **Settings page:** the switch, the word field, how many words are being watched, and
 the row that clears the list.
-
-## Last Seen
-
-Records when people came online and when they went away, so *were they around?* has
-an answer after the fact.
-
-- **Only real changes.** Discord repeats presence constantly as activities change;
-  a repeat is not coming or going and is not written.
-- **Online now first, then last seen,** most recent first, with how long each has
-  been online or how long ago they left.
-- **It starts when the plugin starts.** Time before that is not known, and the page
-  says so instead of guessing.
-- **200 people,** the latest change kept per person.
-- **Forget everyone** is one row.
-
-**Settings page:** the switch, the forget-all row, how it knows, and the two lists.
 
 ## Away
 
@@ -182,9 +144,14 @@ which of those it does.
 - **Only your own voice state** is read; another person moving is ignored.
 - **Every action is guarded** against repeats, so a fast reconnect cannot fire
   the same join twice.
+- **Your own Disconnect is respected.** Leaving a call yourself is not undone;
+  only a drop you did not ask for is.
+- **A server mute or deafen is undone while you are still in the call,** with
+  the client's own mute buttons as a fallback when a reconnect comes back muted.
 
-**Settings page:** the four switches, the rejoin delay, the pinned channel, and a
-line telling you what it would rejoin right now.
+**Settings page:** the four switches, the rejoin delay, the pinned channel by
+name, what it would rejoin right now, and a *This build* group naming the join and
+mute actions the client provides.
 
 ## How they're built
 
@@ -255,9 +222,7 @@ plugins/
 ├── dont-control-me/
 ├── watchlist/
 ├── later/
-├── bookmarks/
 ├── keywords/
-├── last-seen/
 ├── away/
 ├── waiting-on-you/
 └── _shared/                     # theme tokens, the page kit and the menu patch
