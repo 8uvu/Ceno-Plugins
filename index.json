@@ -138,6 +138,30 @@
         }
       }
     },
+    "dev.8uvu.second-thoughts": {
+      "name": "Second Thoughts",
+      "description": "Holds a text message for a few seconds before it leaves, so a typo or the wrong chat can be cancelled.",
+      "author": "cenotaph",
+      "icon": "ClockIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.second-thoughts@1.0.0.zip",
+          "sha256": "4c2ce7b0eb5755e27c6bb1ea6da23986ffa396c9de968fc81ae918a07254cfa0",
+          "size": 4955,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
     "dev.8uvu.typing-watch": {
       "name": "TypingWatch",
       "description": "Remembers who started typing, in case the indicator vanished before you looked.",
@@ -177,6 +201,30 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.typing-watch@1.2.0.zip",
           "sha256": "00516d1efa9696f5d2ebd279732641a9929a81facd49ae4f48f134f369e32848",
           "size": 3270,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        }
+      }
+    },
+    "dev.8uvu.voice-time": {
+      "name": "Voice Time",
+      "description": "Keeps the call history this client does not: every call, how long it lasted, and who was in it with you.",
+      "author": "cenotaph",
+      "icon": "MicrophoneIcon",
+      "channels": {
+        "latest": "1.0.0"
+      },
+      "versions": {
+        "1.0.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.voice-time@1.0.0.zip",
+          "sha256": "97bb4e0453bcd8442d85f28b67b3e242d1c97b79db91e09109bc20db74559f86",
+          "size": 4626,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
