@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.away",
+	"name": "Away",
+	"description": "Answers your DMs while you are out: one short reply you wrote, at most once per chat every few hours, sent through Discord's own action. Off by default.",
+	"author": "cenotaph",
+	"icon": "ClockIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}

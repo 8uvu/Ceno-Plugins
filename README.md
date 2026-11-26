@@ -27,6 +27,8 @@ in the background.
 | **Bookmarks** | Keep a message on this device: the text, its author, the channel and the time. | 1.0.0 |
 | **Keywords** | Get a toast when a message contains a word you follow. | 1.0.0 |
 | **Last Seen** | A local record of when people came online and went away. | 1.0.0 |
+| **Away** | Answers your DMs while you are out, with a reply you wrote. | 1.0.0 |
+| **Waiting on You** | The DMs whose last message is theirs, oldest first. | 1.0.0 |
 | **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.1.0 |
 | **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
@@ -166,6 +168,41 @@ an answer after the fact.
 
 **Settings page:** the switch, the forget-all row, how it knows, and the two lists.
 
+## Away
+
+While you are out, Discord answers your DMs with one short line you wrote — so
+someone who needs you gets an answer instead of silence.
+
+- **Off by default.** Turn it on when you leave, off when you are back.
+- **One reply per chat per cooldown:** every hour, three, six, twelve, or once a
+  day. A second message in the same chat waits its turn.
+- **DMs, and group DMs if you want them.** A server channel is never answered,
+  and neither is a bot or your own message.
+- **Sent as you, through Discord’s own message action.** No account, no server,
+  no token, and nothing else leaves the app.
+- **Only while Discord is open.** A message that arrives while the app is closed
+  gets no reply, and the page says so.
+- **A recent-replies list,** and a line that tells you whether this build
+  exposes the action it needs.
+
+**Settings page:** what is happening now, the reply text, the group switch, the
+cooldown choices, the recent replies, and the limits in plain words.
+
+## Waiting on You
+
+A local list of the conversations whose last message is theirs: the ones you
+meant to answer and did not.
+
+- **Oldest first,** with the message preview and how long it has been waiting.
+- **Send anything and the chat leaves the list,** because you answered.
+- **DMs by default,** group DMs when you turn them on.
+- **Only what it saw.** The list starts empty; a chat whose last message arrived
+  before the plugin started is not listed until something new happens there.
+- **Tap a chat to take it off the list,** or clear the whole list.
+
+**Settings page:** the oldest waiting chat, the list, the two switches, and what
+it can and cannot know.
+
 ## TypingWatch
 
 Discord's typing indicator lasts a few seconds. If you looked away, you missed
@@ -249,6 +286,28 @@ conversation ranked by streak with today's count.
 - **No private endpoints and no copied tokens.** The plugins use the client's own
   actions, stores and HTTP module, so the session never leaves Discord.
 
+### The page kit
+
+`plugins/_shared/lib/` is the one place a settings page is assembled, so every
+plugin draws the same way instead of each one inventing its own layout:
+
+- **`kit.tsx`** — `Page`, `Intro`, `Section`, `Row`, `SwitchRow`, `Field`,
+  `Choices` and `Hero`. Each piece looks Discord’s component up when it is drawn
+  and falls back to React Native with theme tokens, so a build that lacks one
+  loses a row’s decoration, never the page.
+- **`settings.ts`** — `useSettings(storage, defaults)`: the current value plus a
+  setter, and a subscription so a page notices a change that came from a
+  listener rather than from the page.
+- **`toast.ts`** — `say(key, text, tone)`, with the older toast shape as a
+  fallback.
+- **`confirm.ts`** — `ask({title, body, confirm, danger, onConfirm})` on the
+  system dialog every build has.
+- **`format.ts`** — names, channels, `clip`, `span`, `ago`, `plural`, `listOf`,
+  and `phrase` for a readable list of people.
+
+The older plugins still carry their own local helpers; the kit is what the new
+ones are built on.
+
 ## Build and test
 
 ```
@@ -288,7 +347,9 @@ plugins/
 ├── bookmarks/
 ├── keywords/
 ├── last-seen/
-└── _shared/                     # theme tokens and the shared menu patch
+├── away/
+├── waiting-on-you/
+└── _shared/                     # theme tokens, the page kit and the menu patch
 scripts/                         # the verifier harness and its runner
 themes/                          # theme plugins, built and packaged like plugins/
 types/                           # declarations for the @valenced/* imports

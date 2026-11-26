@@ -1,0 +1,20 @@
+{
+	"format": 1,
+	"id": "dev.8uvu.waiting-on-you",
+	"name": "Waiting on You",
+	"description": "A local list of the DMs whose last message is theirs, oldest first. Send anything in a chat and it leaves the list. Nothing is uploaded.",
+	"author": "cenotaph",
+	"icon": "ChatMarkUnreadIcon",
+	"version": "1.0.0",
+	"dependencies": {
+		"valenced.api": {
+			"version": ">=1 <2"
+		},
+		"discord": {
+			"version": "*"
+		}
+	},
+	"dist": {
+		"script": "index.js"
+	}
+}
