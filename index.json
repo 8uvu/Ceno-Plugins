@@ -33,7 +33,7 @@
       "author": "cenotaph",
       "icon": "MicrophoneIcon",
       "channels": {
-        "latest": "1.2.0"
+        "latest": "1.3.0"
       },
       "versions": {
         "1.1.8": {
@@ -53,6 +53,19 @@
           "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.2.0.zip",
           "sha256": "e710bf9a106a159f73aac5f44075a147a8c30985c77867274de694eebc26b145",
           "size": 4124,
+          "dependencies": {
+            "valenced.api": {
+              "version": ">=1 <2"
+            },
+            "discord": {
+              "version": "*"
+            }
+          }
+        },
+        "1.3.0": {
+          "url": "https://8uvu.github.io/Ceno-Plugins/pool/dev.8uvu.dont-control-me@1.3.0.zip",
+          "sha256": "f7abf6d771a9fdafdd93881c95bec13e36b5b704d2a6d717722c573caef2f52f",
+          "size": 4635,
           "dependencies": {
             "valenced.api": {
               "version": ">=1 <2"
