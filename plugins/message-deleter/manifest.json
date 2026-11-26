@@ -5,7 +5,7 @@
 	"description": "Hold a message and delete what you sent in that chat: one message, or every message of yours in the conversation, one request at a time. Asks first and obeys Discord's limits.",
 	"author": "cenotaph",
 	"icon": "TrashIcon",
-	"version": "3.0.0",
+	"version": "3.1.0",
 	"dependencies": {
 		"valenced.api": {
 			"version": ">=1 <2"

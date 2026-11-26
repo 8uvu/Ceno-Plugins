@@ -18,6 +18,20 @@ const created = (id, content, author = ADA) => ({
 const edited = (id, content) => ({ message: { id, content } });
 const deleted = (id) => ({ id, channelId: CHANNEL });
 
+// Discord's design rows, as functions, so the shared page kit draws its real
+// path and every row on the page carries a label to press.
+function addPageDesign(sandbox) {
+    const D = sandbox.designStub;
+    const element = (type, props) => ({ type, props: props ?? {}, children: props?.children });
+    for (const name of ['TableRowGroup', 'TableRow', 'TableSwitchRow']) {
+        const Component = function (props) {
+            return element(Component, props ?? {});
+        };
+        Component.displayName = name;
+        D[name] = Component;
+    }
+}
+
 // A row on the settings page, by the start of its label.
 function findRow(tree, prefix) {
     let found = null;
@@ -50,6 +64,7 @@ async function main() {
             },
         },
     });
+    addPageDesign(sandbox);
 
     const inst = loadBundle('dev.8uvu.message-logger', sandbox);
     await inst.start(sandbox.api);

@@ -1,11 +1,19 @@
 // Clean URLs, by cenotaph. Strips tracking parameters from links in chat.
 
-import { Design } from '@valenced/discord/design'
 import { onFluxEventDispatched } from '@valenced/discord/flux'
 import { useState } from 'react'
-import { ScrollView, Text, TextInput, View } from 'react-native'
-import { settingsScroll, token } from '../../_shared/theme'
-import type { DesignShim, JsonStorage } from '../../_shared/types'
+import {
+	Field,
+	Hero,
+	Intro,
+	Note,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
+import type { JsonStorage } from '../../_shared/types'
 
 interface Settings {
 	enabled: boolean
@@ -125,68 +133,57 @@ export default plugin<{ jsonStorage: Settings }>({
 		logger?.log?.('[CleanURLs] started')
 	},
 	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
-		const settings = api.jsonStorage.use() ?? DEFAULTS
-		const set = (patch: Partial<Settings>) => api.jsonStorage.set(patch)
-		const D = (Design ?? {}) as unknown as DesignShim
-		// React Native's TextInput on purpose: Discord's design input ignores
-		// onChangeText on 352.x, so a field built on it cannot be typed into.
+		const [settings, set] = useSettings(api.jsonStorage, DEFAULTS)
+		const on = settings.enabled !== false
+		// Also kept in local state, so typing never waits on a storage write.
 		const [extra, setExtra] = useState(settings.extra ?? '')
-		const updateExtra = (t: string) => {
-			setExtra(t)
-			set({ extra: t })
-		}
-		if (D.TableRowGroup && D.TableSwitchRow) {
-			return (
-				<D.TableRowGroup title="Clean URLs">
-					<D.TableSwitchRow
-						label="Strip tracking parameters"
-						subLabel="Removes utm_*, fbclid, gclid and friends from links."
-						value={settings.enabled !== false}
-						onValueChange={(v: boolean) => set({ enabled: v })}
-					/>
-					<View style={{ marginVertical: 4 }}>
-						<Text style={{ color: token('TEXT_MUTED'), marginBottom: 2 }}>
-							Extra parameters (comma-separated)
-						</Text>
-						<TextInput
-							style={{
-								color: token('TEXT_NORMAL'),
-								backgroundColor: token('BACKGROUND_TERTIARY'),
-								borderRadius: 8,
-								padding: 8,
-							}}
-							value={extra}
-							onChangeText={updateExtra}
-						/>
-					</View>
-				</D.TableRowGroup>
-			)
+		const updateExtra = (text: string) => {
+			setExtra(text)
+			set({ extra: text })
 		}
 		return (
-			<ScrollView style={settingsScroll}>
-				<Text style={{ color: token('TEXT_NORMAL'), fontWeight: 'bold' }}>
-					Clean URLs
-				</Text>
-				<Text style={{ color: token('TEXT_MUTED') }}>
-					Removes tracking parameters from links.
-				</Text>
-				<Text style={{ color: token('TEXT_NORMAL') }}>
-					Enabled: {settings.enabled !== false ? 'on' : 'off'}
-				</Text>
-				<Text style={{ color: token('TEXT_MUTED') }}>
-					Extra parameters (comma-separated):
-				</Text>
-				<TextInput
-					style={{
-						color: token('TEXT_NORMAL'),
-						backgroundColor: token('BACKGROUND_TERTIARY'),
-						borderRadius: 8,
-						padding: 8,
-					}}
-					value={extra}
-					onChangeText={updateExtra}
+			<Page>
+				<Intro text="Clean URLs takes the tracking out of a link as its message is created or edited: utm_source, fbclid, gclid and the rest of the known list." />
+				<Hero
+					title={on ? 'Clean URLs is on' : 'Clean URLs is off'}
+					line={
+						on
+							? 'Links lose their tracking parameters before the message reaches the chat.'
+							: 'Messages are left exactly as written.'
+					}
+					tone={on ? 'brand' : 'muted'}
+					action={
+						on
+							? { label: 'Turn off', onPress: () => set({ enabled: false }) }
+							: { label: 'Turn on', onPress: () => set({ enabled: true }) }
+					}
 				/>
-			</ScrollView>
+				<Section
+					title="Links"
+					description="One switch for every link; the field adds to the parameters already known."
+				>
+					<SwitchRow
+						label="Strip tracking parameters"
+						subLabel="Removes utm_*, fbclid, gclid and friends from links."
+						value={on}
+						onChange={enabled => set({ enabled })}
+					/>
+					<Field
+						label="Extra parameters"
+						value={extra}
+						onChange={updateExtra}
+						placeholder="si, igsh, mkt_tok"
+						description="Comma-separated. Case does not matter."
+					/>
+				</Section>
+				<Section title="What it leaves alone">
+					<Row
+						label="Everything it does not recognise"
+						subLabel="The address, the path and every other parameter stay exactly as written."
+					/>
+					<Note text="Nothing leaves the device: the message text is read as Discord dispatches it." />
+				</Section>
+			</Page>
 		)
 	},
 })

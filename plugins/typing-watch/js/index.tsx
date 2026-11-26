@@ -1,9 +1,16 @@
 // TypingWatch, by cenotaph. Keeps the last few typing indicators you missed.
-import { Design } from '@valenced/discord/design'
 import { onFluxEventDispatched, Stores } from '@valenced/discord/flux'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { token } from '../../_shared/theme'
-import type { DesignShim, JsonStorage } from '../../_shared/types'
+import { plural } from '../../_shared/lib/format'
+import {
+	Hero,
+	Intro,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
+import type { JsonStorage } from '../../_shared/types'
 
 type TypingPayload = { channelId?: string | number; userId?: string | number }
 
@@ -121,103 +128,59 @@ export default plugin<{ jsonStorage: Settings }>({
 		logger?.log?.('[TypingWatch] started')
 	},
 	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
-		const settings = api.jsonStorage.use() ?? DEFAULTS
-		const set = (patch: Partial<Settings>) =>
-			api.jsonStorage.set(patch).catch?.(() => {})
+		const [settings, set] = useSettings(api.jsonStorage, DEFAULTS)
 		const recent = Array.isArray(settings.recent) ? settings.recent : []
 		const now = Date.now()
-		const D = (Design ?? {}) as unknown as DesignShim
-		// Design.TableRow is missing on some builds. Rendering it anyway throws
-		// "element type is invalid" and takes the whole page down, so an absent
-		// row falls back to plain text with an explicit color.
-		const row = (key: string, label: string, subLabel?: string) =>
-			D.TableRow ? (
-				<D.TableRow key={key} label={label} subLabel={subLabel} />
-			) : (
-				<View key={key} style={{ paddingVertical: 6 }}>
-					<Text style={{ color: token('TEXT_NORMAL') }}>{label}</Text>
-					{subLabel ? (
-						<Text style={{ color: token('TEXT_MUTED') }}>{subLabel}</Text>
-					) : null}
-				</View>
-			)
-		if (D.TableRowGroup) {
-			return (
-				<ScrollView style={{ paddingHorizontal: 16, paddingTop: 16, gap: 16 }}>
-					<D.TableRowGroup title="TypingWatch">
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Remember who types"
-								subLabel="Keeps the last 20 people who started typing."
-								value={settings.enabled !== false}
-								onValueChange={(v: boolean) => set({ enabled: v })}
-							/>
-						) : null}
-						{D.TableRow ? (
-							<D.TableRow
-								label="Clear the list"
-								onPress={() => set({ recent: [] })}
-							/>
-						) : null}
-					</D.TableRowGroup>
-					<D.TableRowGroup title={`Recent (${recent.length})`}>
-						{recent.length === 0
-							? row('empty', 'Nobody has typed yet.')
-							: recent.map((entry: Entry) =>
-									row(
-										entry.channelId + ':' + entry.userId,
-										labelOf(entry),
-										ago(entry.at, now),
-									),
-								)}
-					</D.TableRowGroup>
-				</ScrollView>
-			)
-		}
+		const on = settings.enabled !== false
 		return (
-			<ScrollView style={{ padding: 16 }}>
-				<Text
-					style={{
-						color: token('TEXT_NORMAL'),
-						fontWeight: 'bold',
-						marginBottom: 8,
-					}}
+			<Page>
+				<Intro text="TypingWatch keeps the last 20 typing indicators you missed, so a name that vanished before you looked is still there to read." />
+				<Hero
+					title={
+						recent.length === 0
+							? 'Nobody has typed'
+							: `${recent.length} ${plural(recent.length, 'person', 'people')} remembered`
+					}
+					line={
+						recent.length === 0
+							? 'Start typing anywhere and the list fills itself.'
+							: 'Newest first, one row per person and channel.'
+					}
+					tone={recent.length ? 'brand' : 'muted'}
+				/>
+				<Section title="TypingWatch">
+					<SwitchRow
+						label="Remember who types"
+						subLabel="Keeps the last 20 people who started typing."
+						value={on}
+						onChange={enabled => set({ enabled })}
+					/>
+					<Row
+						label={`Clear the list (${recent.length})`}
+						subLabel="Empties the list; nothing else is touched."
+						onPress={() => set({ recent: [] })}
+					/>
+				</Section>
+				<Section
+					title={recent.length ? `Recent (${recent.length})` : 'Recent'}
+					description={recent.length ? 'Newest first.' : undefined}
 				>
-					TypingWatch
-				</Text>
-				<Pressable
-					accessibilityLabel="Remember who types"
-					onPress={() => set({ enabled: !(settings.enabled !== false) })}
-					style={{ paddingVertical: 8 }}
-				>
-					<Text style={{ color: token('TEXT_NORMAL') }}>
-						Remember who types: {settings.enabled !== false ? 'on' : 'off'}
-					</Text>
-				</Pressable>
-				<Pressable
-					accessibilityLabel="Clear the list"
-					onPress={() => set({ recent: [] })}
-					style={{ paddingVertical: 8 }}
-				>
-					<Text style={{ color: token('TEXT_NORMAL') }}>
-						Clear the list ({recent.length})
-					</Text>
-				</Pressable>
-				{recent.length === 0 ? (
-					<Text style={{ color: token('TEXT_MUTED'), marginTop: 8 }}>
-						Nobody has typed yet.
-					</Text>
-				) : (
-					recent.map((entry: Entry) => (
-						<Text
-							key={entry.channelId + ':' + entry.userId}
-							style={{ color: token('TEXT_NORMAL') }}
-						>
-							{labelOf(entry) + ' — ' + ago(entry.at, now)}
-						</Text>
-					))
-				)}
-			</ScrollView>
+					{recent.length === 0 ? (
+						<Row
+							label="Nobody has typed yet."
+							subLabel="A typing indicator shows up here after it is seen."
+						/>
+					) : (
+						recent.map(entry => (
+							<Row
+								key={entry.channelId + ':' + entry.userId}
+								label={labelOf(entry)}
+								subLabel={ago(entry.at, now)}
+							/>
+						))
+					)}
+				</Section>
+			</Page>
 		)
 	},
 })

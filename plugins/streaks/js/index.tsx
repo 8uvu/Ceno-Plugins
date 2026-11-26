@@ -3,16 +3,23 @@
 // counts as soon as any message went out or came in, so texting someone starts
 // the streak, and the count is drawn next to their name in the chat.
 import * as ImportTracker from '@valenced/discord/common/import-tracker'
-import { Design } from '@valenced/discord/design'
 import { getStore, onFluxEventDispatched, Stores } from '@valenced/discord/flux'
 import * as PathFinders from '@valenced/discord/utils/modules/finders'
 import { after } from '@valenced/patcher'
 import { isValidElement } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { settingsScroll, token } from '../../_shared/theme'
-import { asRecord } from '../../_shared/types'
+import { Text } from 'react-native'
+import { plural } from '../../_shared/lib/format'
+import {
+	Hero,
+	Intro,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
+import { token } from '../../_shared/theme'
 import type {
-	DesignShim,
 	DiscordChannel,
 	JsonStorage,
 	Logger,
@@ -496,125 +503,67 @@ export default plugin<{ jsonStorage: Settings }>({
 			}
 		}
 	}) {
-		const settings = (api.jsonStorage.use() ?? DEFAULTS) as Settings
-		const set = (patch: Partial<Settings>) =>
-			api.jsonStorage.set(patch).catch?.(() => {})
+		const [stored, set] = useSettings(api.jsonStorage, DEFAULTS)
+		const settings: Settings = { ...DEFAULTS, ...stored }
 		const today = dayKey(Date.now())
 		const list = ranked(settings, today)
 		const best = list[0]?.streak ?? 0
-		const D = (Design ?? {}) as unknown as DesignShim
-		const muted = token('TEXT_MUTED')
-		const normal = token('TEXT_NORMAL')
-
-		const row = (key: string, label: string, subLabel?: string) =>
-			D.TableRow ? (
-				<D.TableRow key={key} label={label} subLabel={subLabel} />
-			) : (
-				<View key={key} style={{ paddingVertical: 6 }}>
-					<Text style={{ color: normal }}>{label}</Text>
-					{subLabel ? <Text style={{ color: muted }}>{subLabel}</Text> : null}
-				</View>
-			)
-
-		if (D.TableRowGroup) {
-			return (
-				<ScrollView style={settingsScroll}>
-					<D.TableRowGroup title="Streaks">
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Track streaks"
-								subLabel="Counts the days you and someone talked. Stored on this device only."
-								value={settings.enabled !== false}
-								onValueChange={(v: boolean) => set({ enabled: v })}
-							/>
-						) : null}
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Show the streak in chat"
-								subLabel="Draws the count next to the other person's name."
-								value={settings.badge !== false}
-								onValueChange={(v: boolean) => set({ badge: v })}
-							/>
-						) : null}
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Both sides count"
-								subLabel="A day counts once each of you sent something. Off counts any message."
-								value={settings.bothSides === true}
-								onValueChange={(v: boolean) => set({ bothSides: v })}
-							/>
-						) : null}
-						{D.TableRow ? (
-							<D.TableRow
-								label="Reset all streaks"
-								subLabel="Deletes every conversation this plugin has recorded."
-								onPress={() => set({ conversations: {} })}
-							/>
-						) : null}
-					</D.TableRowGroup>
-					<D.TableRowGroup
-						title={
-							best > 0
-								? 'Best right now: ' + best + (best === 1 ? ' day' : ' days')
-								: 'No streak running'
-						}
-					>
-						{list.length === 0
-							? row('empty', 'Nothing recorded yet.', 'Send a message in a DM to start.')
-							: list.map(entry =>
-									row(entry.id, entry.name, describe(entry)),
-								)}
-					</D.TableRowGroup>
-				</ScrollView>
-			)
-		}
-
-		// Builds without the design rows still get a readable page.
+		const on = settings.enabled !== false
 		return (
-			<ScrollView style={settingsScroll}>
-				<Text style={{ color: normal, fontWeight: 'bold', marginBottom: 8 }}>
-					Streaks
-				</Text>
-				<Pressable
-					accessibilityLabel="Track streaks"
-					onPress={() => set({ enabled: !(settings.enabled !== false) })}
-					style={{ paddingVertical: 8 }}
+			<Page>
+				<Intro text="Streaks counts the days in a row you and someone talked, and can draw the count next to their name in the chat. Everything stays on this device." />
+				<Hero
+					title={
+						best > 0 ? `${best} ${plural(best, 'day')} in a row` : 'No streak running'
+					}
+					line={
+						list.length
+							? `${list.length} ${plural(list.length, 'conversation')} counted, the longest running first.`
+							: 'Send a message in a DM to start one.'
+					}
+					tone={best > 0 ? 'brand' : 'muted'}
+				/>
+				<Section title="Streaks">
+					<SwitchRow
+						label="Track streaks"
+						subLabel="Counts the days you and someone talked. Stored on this device only."
+						value={on}
+						onChange={enabled => set({ enabled })}
+					/>
+					<SwitchRow
+						label="Show the streak in chat"
+						subLabel="Draws the count next to the other person's name."
+						value={settings.badge !== false}
+						onChange={badge => set({ badge })}
+					/>
+					<SwitchRow
+						label="Both sides count"
+						subLabel="A day counts once each of you sent something. Off counts any message."
+						value={settings.bothSides === true}
+						onChange={bothSides => set({ bothSides })}
+					/>
+					<Row
+						label="Reset all streaks"
+						subLabel="Deletes every conversation this plugin has recorded."
+						danger
+						onPress={() => set({ conversations: {} })}
+					/>
+				</Section>
+				<Section
+					title={list.length ? `Conversations (${list.length})` : 'No streak running'}
+					description="Longest running first."
 				>
-					<Text style={{ color: normal }}>
-						Track streaks: {settings.enabled !== false ? 'on' : 'off'}
-					</Text>
-				</Pressable>
-				<Pressable
-					accessibilityLabel="Show the streak in chat"
-					onPress={() => set({ badge: !(settings.badge !== false) })}
-					style={{ paddingVertical: 8 }}
-				>
-					<Text style={{ color: normal }}>
-						Show the streak in chat: {settings.badge !== false ? 'on' : 'off'}
-					</Text>
-				</Pressable>
-				<Pressable
-					accessibilityLabel="Reset all streaks"
-					onPress={() => set({ conversations: {} })}
-					style={{ paddingVertical: 8 }}
-				>
-					<Text style={{ color: normal }}>Reset all streaks</Text>
-				</Pressable>
-				<Text style={{ color: normal, marginTop: 8 }}>
-					{best > 0 ? 'Best right now: ' + best : 'No streak running'}
-				</Text>
-				{list.length === 0 ? (
-					<Text style={{ color: muted, marginTop: 8 }}>
-						Nothing recorded yet. Send a message in a DM to start.
-					</Text>
-				) : (
-					list.map(entry => (
-						<Text key={entry.id} style={{ color: normal, marginTop: 6 }}>
-							{entry.name} — {describe(entry)}
-						</Text>
-					))
-				)}
-			</ScrollView>
+					{list.length === 0 ? (
+						<Row label="Nothing recorded yet." subLabel="Send a message in a DM to start." />
+					) : (
+						list.map(entry => (
+							<Row key={entry.id} label={entry.name} subLabel={describe(entry)} />
+						))
+					)}
+				</Section>
+			</Page>
 		)
 	},
 })
+
+import { asRecord } from '../../_shared/types'

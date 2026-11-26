@@ -1,14 +1,21 @@
 // Don't Control Me, by cenotaph. Puts you back when someone moves, mutes or
 // drops you — and can be told exactly which of that you want.
 
-import { Design } from '@valenced/discord/design'
 import { onFluxEventDispatched, Stores } from '@valenced/discord/flux'
 import { lookupModule } from '@valenced/modules/finders'
 import { withProps } from '@valenced/modules/finders/filters'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { token } from '../../_shared/theme'
+import { plural } from '../../_shared/lib/format'
+import {
+	Choices,
+	Hero,
+	Intro,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
 import type {
-	DesignShim,
 	JsonStorage,
 	VoiceActions,
 	VoiceStateActions,
@@ -205,145 +212,103 @@ export default plugin<{ jsonStorage: Settings }>({
 		logger?.log?.('[DontControlMe] started')
 	},
 	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
-		const settings: Settings = { ...DEFAULTS, ...(api.jsonStorage.use() ?? {}) }
-		const set = (patch: Partial<Settings>) => api.jsonStorage.set(patch)
+		const [stored, set] = useSettings(api.jsonStorage, DEFAULTS)
+		const settings: Settings = { ...DEFAULTS, ...stored }
 		const pin = () => {
 			const id = currentVoiceChannelId()
-			if (id) api.jsonStorage.set({ pinnedChannelId: id })
+			if (id) set({ pinnedChannelId: id })
 		}
-		const D = (Design ?? {}) as unknown as DesignShim
 		const pinned = settings.pinnedChannelId ?? null
 		const last = settings.lastChannelId ?? null
-		if (D.TableRowGroup && D.TableSwitchRow) {
-			const Row = D.TableRow ?? null
-			const Button = D.Button ?? null
-			const RadioGroup = D.TableRadioGroup ?? null
-			const RadioRow = D.TableRadioRow ?? null
-			return (
-				<ScrollView style={{ paddingHorizontal: 16, paddingTop: 16, gap: 16 }}>
-					<D.TableRowGroup title="Don't Control Me">
-						<D.TableSwitchRow
-							label="Rejoin when I get disconnected"
-							subLabel="Discord drops you out of the call; this puts you back."
-							value={settings.reconnect !== false}
-							onValueChange={(v: boolean) => set({ reconnect: v })}
-						/>
-						{RadioGroup && RadioRow ? (
-							<RadioGroup
-								title="Wait before rejoining"
-								value={String(settings.rejoinDelay ?? 2)}
-								onChange={(value: string) =>
-									set({ rejoinDelay: Number(value) })
-								}
-							>
-								{DELAYS.map(delay => (
-									<RadioRow
-										key={delay.value}
-										label={delay.label}
-										value={String(delay.value)}
-										subLabel={
-											String(settings.rejoinDelay ?? 2) === String(delay.value)
-												? 'Selected'
-												: undefined
-										}
-									/>
-								))}
-							</RadioGroup>
-						) : null}
-						<D.TableSwitchRow
-							label="Return to my pinned channel"
-							value={settings.moveToPinned !== false}
-							onValueChange={(v: boolean) => set({ moveToPinned: v })}
-						/>
-						<D.TableSwitchRow
-							label="Undo server mute"
-							value={settings.autoUnmute !== false}
-							onValueChange={(v: boolean) => set({ autoUnmute: v })}
-						/>
-						<D.TableSwitchRow
-							label="Undo server deafen"
-							value={settings.autoUndeafen !== false}
-							onValueChange={(v: boolean) => set({ autoUndeafen: v })}
-						/>
-						{Row ? (
-							<Row
-								label="Rejoin to"
-								subLabel={
-									pinned
-										? pinned + ' (pinned)'
-										: last
-											? last + ' (last call)'
-											: 'Nothing yet — join a voice channel once.'
-								}
-							/>
-						) : null}
-						{Row ? (
-							<Row
-								label="Pinned channel"
-								subLabel={pinned ?? 'None — join a voice channel, then pin it.'}
-							/>
-						) : null}
-						{Button ? (
-							<Button
-								text={pinned ? 'Unpin channel' : 'Pin current channel'}
-								onPress={() =>
-									pinned ? set({ pinnedChannelId: null }) : pin()
-								}
-							/>
-						) : null}
-					</D.TableRowGroup>
-				</ScrollView>
-			)
-		}
+		const rejoin = settings.reconnect !== false
+		const delay = Number(settings.rejoinDelay ?? DEFAULTS.rejoinDelay)
+		const parts = [
+			rejoin ? 'rejoining after a drop' : null,
+			settings.moveToPinned !== false ? 'returning to your pin' : null,
+			settings.autoUnmute !== false ? 'undoing server mute' : null,
+			settings.autoUndeafen !== false ? 'undoing server deafen' : null,
+		].filter((part): part is string => part !== null)
 		return (
-			<View style={{ padding: 16 }}>
-				<Text
-					style={{
-						color: token('TEXT_NORMAL'),
-						fontWeight: 'bold',
-						marginBottom: 8,
-					}}
-				>
-					Don't Control Me
-				</Text>
-				<Text style={{ color: token('TEXT_MUTED'), marginBottom: 8 }}>
-					Pinned: {pinned ?? 'none'} · Last call: {last ?? 'none'}
-				</Text>
-				<Text style={{ color: token('TEXT_MUTED'), marginBottom: 8 }}>
-					Rejoin: {settings.reconnect !== false ? 'on' : 'off'} · Wait:{' '}
-					{settings.rejoinDelay ?? 2}s
-				</Text>
-				<Pressable
-					accessibilityLabel={pinned ? 'Unpin channel' : 'Pin current channel'}
-					onPress={() => (pinned ? set({ pinnedChannelId: null }) : pin())}
-					style={{
-						padding: 12,
-						backgroundColor: token('BACKGROUND_TERTIARY'),
-						borderRadius: 8,
-						marginBottom: 8,
-					}}
-				>
-					<Text style={{ color: token('TEXT_NORMAL') }}>
-						{pinned ? 'Unpin channel' : 'Pin current channel'}
-					</Text>
-				</Pressable>
-				{(
-					['reconnect', 'moveToPinned', 'autoUnmute', 'autoUndeafen'] as const
-				).map(key => (
-					<Pressable
-						key={key}
-						accessibilityLabel={key}
-						onPress={() =>
-							set({ [key]: !(settings[key] !== false) } as Partial<Settings>)
+			<Page>
+				<Intro text="Don't Control Me puts you back where you were: it rejoins a call Discord dropped you out of, undoes a server mute or deafen, and returns you to the channel you pinned." />
+				<Hero
+					title={parts.length ? "Don't Control Me is on" : "Don't Control Me is off"}
+					line={
+						parts.length
+							? `${parts.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`
+							: 'Nothing is undone until a switch below is turned on.'
+					}
+					tone={parts.length ? 'brand' : 'muted'}
+				/>
+				<Section title="When I get disconnected">
+					<SwitchRow
+						label="Rejoin when I get disconnected"
+						subLabel="Discord drops you out of the call; this puts you back."
+						value={rejoin}
+						onChange={reconnect => set({ reconnect })}
+					/>
+					<Row
+						label="Wait before rejoining"
+						subLabel={`${delay === 0 ? 'Straight away' : `${delay} ${plural(delay, 'second')}`} — a short pause reads as Discord reconnecting.`}
+					/>
+					<Choices
+						value={String(delay)}
+						options={DELAYS.map(item => ({
+							value: String(item.value),
+							label: item.label,
+						}))}
+						onChange={value => set({ rejoinDelay: Number(value) })}
+					/>
+				</Section>
+				<Section title="Where you come back to">
+					<SwitchRow
+						label="Return to my pinned channel"
+						subLabel="Off puts you back in the call you were dropped from."
+						value={settings.moveToPinned !== false}
+						onChange={moveToPinned => set({ moveToPinned })}
+					/>
+					<Row
+						label="Rejoin to"
+						subLabel={
+							pinned
+								? pinned + ' (pinned)'
+								: last
+									? last + ' (last call)'
+									: 'Nothing yet — join a voice channel once.'
 						}
-						style={{ paddingVertical: 10 }}
-					>
-						<Text style={{ color: token('TEXT_NORMAL') }}>
-							{key}: {settings[key] !== false ? 'on' : 'off'}
-						</Text>
-					</Pressable>
-				))}
-			</View>
+					/>
+					<Row
+						label="Pinned channel"
+						subLabel={pinned ?? 'None — join a voice channel, then pin it.'}
+					/>
+					<Row
+						label={pinned ? 'Unpin channel' : 'Pin current channel'}
+						subLabel={
+							pinned
+								? 'Clears the pin; the last call is still remembered.'
+								: 'Pins the voice channel you are in now.'
+						}
+						onPress={() => (pinned ? set({ pinnedChannelId: null }) : pin())}
+					/>
+				</Section>
+				<Section
+					title="Server mute and deafen"
+					description="Only where you have permission; a channel that refuses is left alone."
+				>
+					<SwitchRow
+						label="Undo server mute"
+						subLabel="Comes back with your microphone on."
+						value={settings.autoUnmute !== false}
+						onChange={autoUnmute => set({ autoUnmute })}
+					/>
+					<SwitchRow
+						label="Undo server deafen"
+						subLabel="Comes back able to hear the call."
+						value={settings.autoUndeafen !== false}
+						onChange={autoUndeafen => set({ autoUndeafen })}
+					/>
+				</Section>
+			</Page>
 		)
 	},
 })

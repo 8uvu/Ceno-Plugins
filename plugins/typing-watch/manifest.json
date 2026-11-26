@@ -5,7 +5,7 @@
     "description": "Remembers who started typing, in case the indicator vanished before you looked.",
     "author": "cenotaph",
     "icon": "EyeIcon",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "dependencies": {
         "valenced.api": {
             "version": ">=1 <2"

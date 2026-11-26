@@ -9,13 +9,19 @@ import { ToastActionCreators } from '@valenced/discord/actions'
 import { Design } from '@valenced/discord/design'
 import { Stores } from '@valenced/discord/flux'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
-import { Pressable, ScrollView, Text, View } from 'react-native'
 import { addMessageMenuRows } from '../../_shared/actionSheet'
-import { settingsScroll, token } from '../../_shared/theme'
-import { asRecord } from '../../_shared/types'
+import { plural } from '../../_shared/lib/format'
+import {
+	Hero,
+	Intro,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
 import type {
 	DesignComponent,
-	DesignShim,
 	JsonStorage,
 	Logger,
 } from '../../_shared/types'
@@ -332,118 +338,75 @@ export default plugin<{ jsonStorage: Settings }>({
 			}
 		}
 	}) {
-		const settings = ((api.jsonStorage.use() as unknown) ?? DEFAULTS) as Settings
-		const set = (patch: Partial<Settings>) => {
-			Promise.resolve(api.jsonStorage.set(patch)).catch?.(() => {})
-		}
+		const [stored, set] = useSettings(api.jsonStorage, DEFAULTS)
+		const settings: Settings = { ...DEFAULTS, ...stored }
 		const now = Date.now()
 		const pings = pingsOf(settings)
 			.filter(ping => ping && typeof ping.at === 'number')
 			.sort((a, b) => a.at - b.at)
-		const D = (Design ?? {}) as unknown as DesignShim
-		const normal = token('TEXT_NORMAL')
-		const muted = token('TEXT_MUTED')
-
-		const row = (key: string, label: string, subLabel?: string) =>
-			D.TableRow ? (
-				<D.TableRow key={key} label={label} subLabel={subLabel} />
-			) : (
-				<View key={key} style={{ paddingVertical: 6 }}>
-					<Text style={{ color: normal }}>{label}</Text>
-					{subLabel ? <Text style={{ color: muted }}>{subLabel}</Text> : null}
-				</View>
-			)
-
-		if (D.TableRowGroup) {
-			return (
-				<ScrollView style={settingsScroll}>
-					<D.TableRowGroup
-						title="Later"
-						description="Hold a message and pick Ping me in 1 hour, 3 hours or tomorrow. The ping is a toast on this device."
-					>
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Allow pings"
-								subLabel="Off stops new ones; the pings already set still fire."
-								value={settings.enabled !== false}
-								onValueChange={(v: boolean) => set({ enabled: v })}
-							/>
-						) : null}
-						{D.TableRow ? (
-							<D.TableRow
-								label={`Cancel every ping (${pings.length})`}
-								subLabel="Removes them from this device."
-								onPress={() => set({ pings: [] })}
-							/>
-						) : null}
-						{D.TableRow ? (
-							<D.TableRow
-								label="While the app is closed"
-								subLabel="A ping that came due is shown the next time the plugin starts, not as a phone notification."
-							/>
-						) : null}
-					</D.TableRowGroup>
-					<D.TableRowGroup
-						title={pings.length === 0 ? 'Nothing waiting' : `Waiting (${pings.length})`}
-						description="Soonest first."
-					>
-						{pings.length === 0
-							? row('empty', 'Nothing waiting.', 'Hold a message and set a ping.')
-							: pings.map(ping =>
-									D.TableRow ? (
-										<D.TableRow
-											key={ping.id}
-											label={`“${ping.preview}”`}
-											subLabel={`${when(ping.at, now)} · ${ping.authorName || 'someone'}${ping.channelName ? ' in ' + ping.channelName : ''}`}
-										/>
-									) : (
-										row(
-											ping.id,
-											`“${ping.preview}”`,
-											`${when(ping.at, now)} · ${ping.authorName || 'someone'}`,
-										)
-									),
-								)}
-					</D.TableRowGroup>
-				</ScrollView>
-			)
-		}
-
-		// Builds without the design rows still get a readable page.
+		const on = settings.enabled !== false
+		const next = pings[0]
 		return (
-			<ScrollView style={settingsScroll}>
-				<Text style={{ color: normal, fontWeight: 'bold' }}>Later</Text>
-				<Text style={{ color: muted }}>
-					Hold a message and pick when to be pinged about it.
-				</Text>
-				<Pressable
-					accessibilityLabel="Allow pings"
-					onPress={() => set({ enabled: !(settings.enabled !== false) })}
-					style={{ paddingVertical: 8 }}
+			<Page>
+				<Intro text="Later holds a message for you: hold it, pick an hour, three hours or tomorrow, and this device brings it back as a toast when it comes due." />
+				<Hero
+					title={
+						pings.length === 0
+							? 'Nothing waiting'
+							: `${pings.length} ${plural(pings.length, 'ping')} waiting`
+					}
+					line={
+						next
+							? `The next one is ${when(next.at, now)}.`
+							: 'Hold a message and pick a time.'
+					}
+					tone={pings.length ? 'brand' : 'muted'}
+				/>
+				<Section
+					title="Pings"
+					description="Off stops new ones; the pings already set still fire."
 				>
-					<Text style={{ color: normal }}>
-						Allow pings: {settings.enabled !== false ? 'on' : 'off'}
-					</Text>
-				</Pressable>
-				<Pressable
-					accessibilityLabel="Cancel every ping"
-					onPress={() => set({ pings: [] })}
-					style={{ paddingVertical: 8 }}
+					<SwitchRow
+						label="Allow pings"
+						subLabel="The menu offers an hour, three hours and tomorrow."
+						value={on}
+						onChange={enabled => set({ enabled })}
+					/>
+					<Row
+						label={`Cancel every ping (${pings.length})`}
+						subLabel="Removes them from this device."
+						onPress={() => set({ pings: [] })}
+					/>
+				</Section>
+				<Section
+					title={
+						pings.length === 0 ? 'Nothing waiting' : `Waiting (${pings.length})`
+					}
+					description={
+						pings.length === 0 ? 'Hold a message and set a ping.' : 'Soonest first.'
+					}
 				>
-					<Text style={{ color: normal }}>
-						Cancel every ping ({pings.length})
-					</Text>
-				</Pressable>
-				{pings.length === 0 ? (
-					<Text style={{ color: muted, marginTop: 8 }}>Nothing waiting.</Text>
-				) : (
-					pings.map(ping => (
-						<Text key={ping.id} style={{ color: normal, marginTop: 6 }}>
-							{`“${ping.preview}” — ${when(ping.at, now)}`}
-						</Text>
-					))
-				)}
-			</ScrollView>
+					{pings.length === 0 ? (
+						<Row label="Nothing waiting." subLabel="Hold a message and set a ping." />
+					) : (
+						pings.map(ping => (
+							<Row
+								key={ping.id}
+								label={`“${ping.preview}”`}
+								subLabel={`${when(ping.at, now)} · ${ping.authorName || 'someone'}${ping.channelName ? ' in ' + ping.channelName : ''}`}
+							/>
+						))
+					)}
+				</Section>
+				<Section title="While the app is closed">
+					<Row
+						label="A ping waits for you"
+						subLabel="A ping that came due while the app was closed is shown the next time Discord opens, not as a phone notification."
+					/>
+				</Section>
+			</Page>
 		)
 	},
 })
+
+import { asRecord } from '../../_shared/types'

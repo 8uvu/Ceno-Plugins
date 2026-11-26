@@ -5,12 +5,19 @@
 // arrived while the plugin was running are remembered, and nothing is sent
 // anywhere. The page lists what changed, newest first, with the text before and
 // after.
-import { Design } from '@valenced/discord/design'
 import { onFluxEventDispatched, Stores } from '@valenced/discord/flux'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { settingsScroll, token } from '../../_shared/theme'
-import { asRecord } from '../../_shared/types'
-import type { DesignShim, Logger } from '../../_shared/types'
+import { plural } from '../../_shared/lib/format'
+import {
+	Hero,
+	Intro,
+	Note,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
+import type { Logger } from '../../_shared/types'
 
 type Kind = 'deleted' | 'edited'
 
@@ -275,132 +282,72 @@ export default plugin<{ jsonStorage: Settings }>({
 			}
 		}
 	}) {
-		const settings = (api.jsonStorage.use() ?? DEFAULTS) as Settings
-		const set = (patch: Partial<Settings>) => {
-			Promise.resolve(api.jsonStorage.set(patch)).catch?.(() => {})
-		}
+		const [stored, set] = useSettings(api.jsonStorage, DEFAULTS)
+		const settings: Settings = { ...DEFAULTS, ...stored }
 		const log = Array.isArray(settings.log) ? settings.log : []
 		const recent = log.slice(0, 20)
 		const now = Date.now()
-		const D = (Design ?? {}) as unknown as DesignShim
-		const normal = token('TEXT_NORMAL')
-		const muted = token('TEXT_MUTED')
-		const danger = token('TEXT_DANGER')
+		const on = settings.enabled !== false
 
 		const describe = (entry: Entry): string =>
 			entry.kind === 'deleted'
 				? `Deleted: “${clip(entry.before)}” · ${ago(entry.at, now)}`
 				: `“${clip(entry.before)}” → “${clip(entry.after)}” · ${ago(entry.at, now)}`
 
-		const row = (key: string, label: string, subLabel?: string) =>
-			D.TableRow ? (
-				<D.TableRow key={key} label={label} subLabel={subLabel} />
-			) : (
-				<View key={key} style={{ paddingVertical: 6 }}>
-					<Text style={{ color: normal }}>{label}</Text>
-					{subLabel ? <Text style={{ color: muted }}>{subLabel}</Text> : null}
-				</View>
-			)
-
-		if (D.TableRowGroup) {
-			return (
-				<ScrollView style={settingsScroll}>
-					<D.TableRowGroup
-						title="Message Logger"
-						description="Keeps the edits and deletions this device saw. Nothing is uploaded and no other copy of the chat is made."
-					>
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Keep a log"
-								subLabel="Off stops recording; the entries already kept stay."
-								value={settings.enabled !== false}
-								onValueChange={(v: boolean) => set({ enabled: v })}
-							/>
-						) : null}
-						{D.TableRow ? (
-							<D.TableRow
-								label={`Clear the log (${log.length})`}
-								subLabel="Removes every entry from this device."
-								onPress={() => set({ log: [] })}
-							/>
-						) : null}
-						{D.TableRow ? (
-							<D.TableRow
-								label="What it can see"
-								subLabel="Only messages that arrived while the plugin was running. A message sent before it started has no earlier text to keep."
-							/>
-						) : null}
-					</D.TableRowGroup>
-					<D.TableRowGroup
-						title={
-							log.length === 0
-								? 'Nothing logged yet'
-								: `Recent (${log.length})`
-						}
-					>
-						{recent.length === 0
-							? row('empty', 'Nothing logged yet.', 'Edits and deletions show up here.')
-							: recent.map((entry, index) =>
-									D.TableRow ? (
-										<D.TableRow
-											key={entry.id + ':' + entry.at + ':' + index}
-											label={`${entry.authorName || 'Someone'} · ${entry.channelName || entry.channelId}`}
-											subLabel={describe(entry)}
-										/>
-									) : (
-										row(
-											entry.id + ':' + entry.at + ':' + index,
-											`${entry.authorName || 'Someone'} · ${entry.channelName || entry.channelId}`,
-											describe(entry),
-										)
-									),
-								)}
-					</D.TableRowGroup>
-				</ScrollView>
-			)
-		}
-
-		// Builds without the design rows still get a readable page.
 		return (
-			<ScrollView style={settingsScroll}>
-				<Text style={{ color: normal, fontWeight: 'bold' }}>Message Logger</Text>
-				<Text style={{ color: muted }}>
-					Keeps the edits and deletions this device saw.
-				</Text>
-				<Pressable
-					accessibilityLabel="Keep a log"
-					onPress={() => set({ enabled: !(settings.enabled !== false) })}
-					style={{ paddingVertical: 8 }}
+			<Page>
+				<Intro text="Message Logger keeps the edits and deletions this device saw, with the text before and after. Nothing is uploaded and no second copy of the chat is made." />
+				<Hero
+					title={
+						log.length === 0
+							? 'Nothing logged yet'
+							: `${log.length} ${plural(log.length, 'entry', 'entries')} kept`
+					}
+					line="Only messages that arrived while the plugin was running."
+					tone={log.length ? 'brand' : 'muted'}
+				/>
+				<Section
+					title="Log"
+					description="Off stops recording; the entries already kept stay."
 				>
-					<Text style={{ color: normal }}>
-						Keep a log: {settings.enabled !== false ? 'on' : 'off'}
-					</Text>
-				</Pressable>
-				<Pressable
-					accessibilityLabel="Clear the log"
-					onPress={() => set({ log: [] })}
-					style={{ paddingVertical: 8 }}
+					<SwitchRow
+						label="Keep a log"
+						subLabel="Edits and deletions are compared against what was already seen."
+						value={on}
+						onChange={enabled => set({ enabled })}
+					/>
+					<Row
+						label={`Clear the log (${log.length})`}
+						subLabel="Removes every entry from this device."
+						onPress={() => set({ log: [] })}
+					/>
+				</Section>
+				<Section
+					title={log.length === 0 ? 'Nothing logged yet' : `Recent (${log.length})`}
+					description={recent.length ? 'Newest first, 20 at a time.' : undefined}
 				>
-					<Text style={{ color: normal }}>Clear the log ({log.length})</Text>
-				</Pressable>
-				{recent.length === 0 ? (
-					<Text style={{ color: muted, marginTop: 8 }}>Nothing logged yet.</Text>
-				) : (
-					recent.map((entry, index) => (
-						<Text
-							key={entry.id + ':' + entry.at + ':' + index}
-							style={{ color: normal, marginTop: 6 }}
-						>
-							{(entry.authorName || 'Someone') +
-								' · ' +
-								(entry.channelName || entry.channelId)}
-						</Text>
-					))
-				)}
-				<Text style={{ color: danger, marginTop: 8 }}>
-					Only messages that arrived while the plugin was running.
-				</Text>
-			</ScrollView>
+					{recent.length === 0 ? (
+						<Row label="Nothing logged yet." subLabel="Edits and deletions show up here." />
+					) : (
+						recent.map((entry, index) => (
+							<Row
+								key={entry.id + ':' + entry.at + ':' + index}
+								label={`${entry.authorName || 'Someone'} · ${entry.channelName || entry.channelId}`}
+								subLabel={describe(entry)}
+							/>
+						))
+					)}
+				</Section>
+				<Section title="What it can see">
+					<Row
+						label="Only what it watched"
+						subLabel="A message sent before the plugin started has no earlier text to keep, so it is not logged."
+					/>
+					<Note text="The last 500 messages are held in memory only to notice a change; the log itself stays on this device." />
+				</Section>
+			</Page>
 		)
 	},
 })
+
+import { asRecord } from '../../_shared/types'

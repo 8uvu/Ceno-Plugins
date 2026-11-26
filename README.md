@@ -20,19 +20,19 @@ in the background.
 
 | Plugin | What it does | Version |
 | --- | --- | --- |
-| **Message Deleter** | Hold a message and delete what you sent in that chat: one message, or all of them, a second apart. | 3.0.0 |
-| **Message Logger** | Keeps the edits and deletions this device saw, with the text before and after. | 1.0.0 |
-| **Watchlist** | Get a toast when someone you watch comes online, types to you, or sends a message. | 1.0.0 |
-| **Later** | Hold a message and be pinged about it in an hour, in three hours, or tomorrow. | 1.0.0 |
+| **Message Deleter** | Hold a message and delete what you sent in that chat: one message, or all of them, a second apart. | 3.1.0 |
+| **Message Logger** | Keeps the edits and deletions this device saw, with the text before and after. | 1.1.0 |
+| **Watchlist** | Get a toast when someone you watch comes online, types to you, or sends a message. | 1.1.0 |
+| **Later** | Hold a message and be pinged about it in an hour, in three hours, or tomorrow. | 1.1.0 |
 | **Bookmarks** | Keep a message on this device: the text, its author, the channel and the time. | 1.0.0 |
 | **Keywords** | Get a toast when a message contains a word you follow. | 1.0.0 |
 | **Last Seen** | A local record of when people came online and went away. | 1.0.0 |
 | **Away** | Answers your DMs while you are out, with a reply you wrote. | 1.0.0 |
 | **Waiting on You** | The DMs whose last message is theirs, oldest first. | 1.0.0 |
-| **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.1.0 |
-| **Clean URLs** | Strips tracking parameters from links. | 1.1.11 |
-| **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.1.8 |
-| **Streaks** | Counts how many days in a row you have talked to someone and shows the count next to their name. | 1.1.0 |
+| **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.2.0 |
+| **Clean URLs** | Strips tracking parameters from links. | 1.2.0 |
+| **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.2.0 |
+| **Streaks** | Counts how many days in a row you have talked to someone and shows the count next to their name. | 1.2.0 |
 
 ---
 
@@ -79,8 +79,8 @@ the old text is kept so you can still read it.
 - **Capped and clearable:** 200 entries by default (20–1000), with a row that
   wipes the log.
 
-**Settings page:** the switch, the size of the log, what it can and cannot see,
-and the 20 most recent entries with their before/after text.
+**Settings page:** the switch, the clear row, what it can and cannot see, and the
+20 most recent entries with their before/after text.
 
 ## Watchlist
 
@@ -291,10 +291,10 @@ conversation ranked by streak with today's count.
 `plugins/_shared/lib/` is the one place a settings page is assembled, so every
 plugin draws the same way instead of each one inventing its own layout:
 
-- **`kit.tsx`** — `Page`, `Intro`, `Section`, `Row`, `SwitchRow`, `Field`,
-  `Choices` and `Hero`. Each piece looks Discord’s component up when it is drawn
-  and falls back to React Native with theme tokens, so a build that lacks one
-  loses a row’s decoration, never the page.
+- **`kit.tsx`** — `Page`, `Intro`, `Hero`, `Section`, `Row`, `SwitchRow`,
+  `Field`, `Choices` and `Note`. Each piece looks Discord’s component up when it
+  is drawn and falls back to React Native with theme tokens, so a build that
+  lacks one loses a row’s decoration, never the page.
 - **`settings.ts`** — `useSettings(storage, defaults)`: the current value plus a
   setter, and a subscription so a page notices a change that came from a
   listener rather than from the page.
@@ -305,8 +305,8 @@ plugin draws the same way instead of each one inventing its own layout:
 - **`format.ts`** — names, channels, `clip`, `span`, `ago`, `plural`, `listOf`,
   and `phrase` for a readable list of people.
 
-The older plugins still carry their own local helpers; the kit is what the new
-ones are built on.
+Every settings page in this repository is built on it — the older plugins and
+the new ones alike — so they all open the same way.
 
 ## Build and test
 

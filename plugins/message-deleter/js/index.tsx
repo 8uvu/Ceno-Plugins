@@ -28,8 +28,15 @@ import { withName, withProps } from '@valenced/modules/finders/filters'
 import { instead } from '@valenced/patcher'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
 import { createElement } from 'react'
-import { Alert, ScrollView, Text } from 'react-native'
-import { readableText, settingsScroll, token } from '../../_shared/theme'
+import { Alert } from 'react-native'
+import {
+	Hero,
+	Intro,
+	Page,
+	Row,
+	Section,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
 import { asRecord, errorMessage } from '../../_shared/types'
 import type { DesignComponent, DesignShim, Logger } from '../../_shared/types'
 
@@ -868,19 +875,6 @@ function patchChannelSheet(): () => void {
 
 // ─── Settings page ───────────────────────────────────────────────────────────
 
-function BodyText({ text }: { text: string }): unknown {
-	const design = (Design ?? {}) as DesignShim
-	const DText = design.Text
-	if (typeof DText === 'function') {
-		return <DText variant="text-sm/medium">{text}</DText>
-	}
-	return (
-		<Text style={{ color: readableText(), fontSize: 15, lineHeight: 21 }}>
-			{text}
-		</Text>
-	)
-}
-
 export default plugin({
 	start({
 		cleanup,
@@ -907,78 +901,56 @@ export default plugin({
 		timers.clear()
 	},
 	SettingsComponent() {
-		const design = (Design ?? {}) as DesignShim
-		const Group = design.TableRowGroup
-		const Row = design.TableRow
-		const danger = token('TEXT_DANGER')
 		const status = running ? progressText || 'Deleting…' : resultText
-
-		if (typeof Group === 'function' && typeof Row === 'function') {
-			return (
-				<ScrollView style={settingsScroll}>
-					<Group
-						title="Message Deleter"
-						description="Hold a message in a chat and delete what you sent, one message or all of them."
-					>
-						<Row
-							label="Delete one message"
-							subLabel="Hold a message you sent, then choose Delete this message."
-						/>
-						<Row
-							label="Delete all your messages"
-							subLabel="Hold any message in the chat (or the chat itself in the list), then choose Delete all my messages."
-						/>
-						<Row
-							label="One at a time"
-							subLabel="A second between deletes, and Discord’s own wait is obeyed when it asks for one."
-						/>
-					</Group>
-					<Group title="Status">
-						<Row label="Last result" subLabel={status} />
-						{running ? (
-							<Row
-								label="Stop deleting"
-								subLabel="Finishes the message already being deleted."
-								variant="danger"
-								onPress={stopRun}
-							/>
-						) : null}
-					</Group>
-					<Group title="Diagnostics">
-						<Row label="Message menu" subLabel={diagnostics.menu} />
-						<Row label="Chat menu" subLabel={diagnostics.channelMenu} />
-						<Row label="Delete action" subLabel={diagnostics.actions} />
-						<Row label="Chat history" subLabel={diagnostics.history} />
-					</Group>
-					<Group
-						title="Careful"
-						description="Deleting removes a message for everyone and cannot be undone."
-					>
-						<Row label="Deleting cannot be undone" variant="danger" />
-					</Group>
-				</ScrollView>
-			)
-		}
-
 		return (
-			<ScrollView style={settingsScroll}>
-				<BodyText text="Message Deleter" />
-				<BodyText text="Hold a message in a chat, then choose Delete this message or Delete all my messages." />
-				<BodyText text={status} />
-				<BodyText text={diagnostics.menu} />
-				<BodyText text={diagnostics.channelMenu} />
-				<BodyText text={diagnostics.actions} />
-				<BodyText text={diagnostics.history} />
-				<Text
-					style={{
-						color: danger ?? readableText(),
-						fontSize: 15,
-						lineHeight: 21,
-					}}
+			<Page>
+				<Intro text="Message Deleter works from the long-press menu: hold a message you sent and delete it, or hold any message in a chat and delete every message you sent there." />
+				<Hero
+					title={running ? 'Deleting…' : 'Nothing is running'}
+					line={status}
+					tone={running ? 'brand' : 'muted'}
+				/>
+				<Section title="How it works">
+					<Row
+						label="Delete one message"
+						subLabel="Hold a message you sent, then choose Delete this message."
+					/>
+					<Row
+						label="Delete all your messages"
+						subLabel="Hold any message in the chat (or the chat itself in the list), then choose Delete all my messages."
+					/>
+					<Row
+						label="One at a time"
+						subLabel="A second between deletes, and Discord’s own wait is obeyed when it asks for one."
+					/>
+				</Section>
+				<Section title="Status" description="What the last run did.">
+					<Row label="Last result" subLabel={status} />
+					{running ? (
+						<Row
+							label="Stop deleting"
+							subLabel="Finishes the message already being deleted."
+							danger
+							onPress={stopRun}
+						/>
+					) : null}
+				</Section>
+				<Section
+					title="Diagnostics"
+					description="Each piece this build provides. A row that says it is missing names what cannot work."
 				>
-					Deleting cannot be undone.
-				</Text>
-			</ScrollView>
+					<Row label="Message menu" subLabel={diagnostics.menu} />
+					<Row label="Chat menu" subLabel={diagnostics.channelMenu} />
+					<Row label="Delete action" subLabel={diagnostics.actions} />
+					<Row label="Chat history" subLabel={diagnostics.history} />
+				</Section>
+				<Section
+					title="Careful"
+					description="Deleting removes a message for everyone and cannot be undone."
+				>
+					<Row label="Deleting cannot be undone" danger />
+				</Section>
+			</Page>
 		)
 	},
 })

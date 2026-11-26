@@ -5,7 +5,7 @@
     "description": "Counts how many days in a row you have talked to someone, and shows the streak next to their name in the chat. Stored on this device only.",
     "author": "cenotaph",
     "icon": "MessageIcon",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "dependencies": {
         "valenced.api": {
             "version": ">=1 <2"

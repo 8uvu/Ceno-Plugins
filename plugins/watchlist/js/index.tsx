@@ -8,13 +8,19 @@ import { ToastActionCreators } from '@valenced/discord/actions'
 import { Design } from '@valenced/discord/design'
 import { onFluxEventDispatched, Stores } from '@valenced/discord/flux'
 import { lookupGeneratedIconComponent } from '@valenced/utils/discord'
-import { Pressable, ScrollView, Text, View } from 'react-native'
 import { addMessageMenuRows } from '../../_shared/actionSheet'
-import { settingsScroll, token } from '../../_shared/theme'
-import { asRecord } from '../../_shared/types'
+import {
+	Hero,
+	Intro,
+	Note,
+	Page,
+	Row,
+	Section,
+	SwitchRow,
+} from '../../_shared/lib/kit'
+import { useSettings } from '../../_shared/lib/settings'
 import type {
 	DesignComponent,
-	DesignShim,
 	JsonStorage,
 	Logger,
 } from '../../_shared/types'
@@ -315,146 +321,86 @@ export default plugin<{ jsonStorage: Settings }>({
 		statuses.clear()
 		lastToast.clear()
 	},
-	SettingsComponent({
-		api,
-	}: {
-		api: {
-			jsonStorage: JsonStorage<Settings> | {
-				use(): unknown
-				set(patch: Partial<Settings>): Promise<unknown>
-			}
-		}
-	}) {
-		const settings = ((api.jsonStorage.use() as unknown) ?? DEFAULTS) as Settings
-		const set = (patch: Partial<Settings>) => {
-			Promise.resolve(api.jsonStorage.set(patch)).catch?.(() => {})
-		}
+	SettingsComponent({ api }: { api: { jsonStorage: JsonStorage<Settings> } }) {
+		const [stored, set] = useSettings(api.jsonStorage, DEFAULTS)
+		const settings: Settings = { ...DEFAULTS, ...stored }
 		const people = Object.values(settings.people ?? {}).sort((a, b) =>
 			(a.name || '').localeCompare(b.name || ''),
 		)
-		const D = (Design ?? {}) as unknown as DesignShim
-		const normal = token('TEXT_NORMAL')
-		const muted = token('TEXT_MUTED')
-
-		const row = (key: string, label: string, subLabel?: string) =>
-			D.TableRow ? (
-				<D.TableRow key={key} label={label} subLabel={subLabel} />
-			) : (
-				<View key={key} style={{ paddingVertical: 6 }}>
-					<Text style={{ color: normal }}>{label}</Text>
-					{subLabel ? <Text style={{ color: muted }}>{subLabel}</Text> : null}
-				</View>
-			)
-
-		if (D.TableRowGroup) {
-			return (
-				<ScrollView style={settingsScroll}>
-					<D.TableRowGroup
-						title="Watchlist"
-						description="Hold a message and pick Watch to be told when that person comes online, types to you, or sends a message."
-					>
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="Track this list"
-								subLabel="Off stops every notification; the list is kept."
-								value={settings.enabled !== false}
-								onValueChange={(v: boolean) => set({ enabled: v })}
-							/>
-						) : null}
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="When they come online"
-								subLabel="One toast when they go from offline to online."
-								value={settings.presence !== false}
-								onValueChange={(v: boolean) => set({ presence: v })}
-							/>
-						) : null}
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="When they start typing"
-								subLabel="At most one toast per person every 15 seconds."
-								value={settings.typing !== false}
-								onValueChange={(v: boolean) => set({ typing: v })}
-							/>
-						) : null}
-						{D.TableSwitchRow ? (
-							<D.TableSwitchRow
-								label="When they send a message"
-								subLabel="At most one toast per person every 5 seconds."
-								value={settings.messages !== false}
-								onValueChange={(v: boolean) => set({ messages: v })}
-							/>
-						) : null}
-					</D.TableRowGroup>
-					<D.TableRowGroup
-						title={`Watching (${people.length})`}
-						description="Tap a name to stop watching that person."
-					>
-						{people.length === 0
-							? row('empty', 'Nobody yet.', 'Hold a message and pick Watch.')
-							: people.map(person =>
-									D.TableRow ? (
-										<D.TableRow
-											key={person.id}
-											label={person.name || person.id}
-											subLabel={`${person.id} — tap to stop watching`}
-											onPress={() => {
-												const next = { ...(settings.people ?? {}) }
-												delete next[person.id]
-												set({ people: next })
-											}}
-										/>
-									) : (
-										row(
-											person.id,
-											person.name || person.id,
-											'Tap to stop watching',
-										)
-									),
-								)}
-					</D.TableRowGroup>
-				</ScrollView>
-			)
-		}
-
-		// Builds without the design rows still get a readable page.
+		const on = settings.enabled !== false
 		return (
-			<ScrollView style={settingsScroll}>
-				<Text style={{ color: normal, fontWeight: 'bold' }}>Watchlist</Text>
-				<Text style={{ color: muted }}>
-					Hold a message and pick Watch to be told when that person is around.
-				</Text>
-				<Pressable
-					accessibilityLabel="Track this list"
-					onPress={() => set({ enabled: !(settings.enabled !== false) })}
-					style={{ paddingVertical: 8 }}
+			<Page>
+				<Intro text="Watchlist gives you a tap on the shoulder when someone you are watching comes online, starts typing to you, or sends you a message. It stays on this device." />
+				<Hero
+					title={people.length === 0 ? 'Nobody on the list' : `Watching ${people.length}`}
+					line={
+						people.length === 0
+							? 'Hold a message and pick Watch to add someone.'
+							: 'One toast per person per kind of event, never a wall of them.'
+					}
+					tone={people.length ? 'brand' : 'muted'}
+				/>
+				<Section title="Notifications" description="Off stops that kind of toast; the list is kept.">
+					<SwitchRow
+						label="Track this list"
+						subLabel="Off stops every notification; the list is kept."
+						value={on}
+						onChange={enabled => set({ enabled })}
+					/>
+					<SwitchRow
+						label="When they come online"
+						subLabel="One toast when they go from offline to online."
+						value={settings.presence !== false}
+						onChange={presence => set({ presence })}
+					/>
+					<SwitchRow
+						label="When they start typing"
+						subLabel="At most one toast per person every 15 seconds."
+						value={settings.typing !== false}
+						onChange={typing => set({ typing })}
+					/>
+					<SwitchRow
+						label="When they send a message"
+						subLabel="At most one toast per person every 5 seconds."
+						value={settings.messages !== false}
+						onChange={messages => set({ messages })}
+					/>
+				</Section>
+				<Section
+					title={`Watching (${people.length})`}
+					description={people.length ? 'Tap a name to stop watching that person.' : undefined}
 				>
-					<Text style={{ color: normal }}>
-						Track this list: {settings.enabled !== false ? 'on' : 'off'}
-					</Text>
-				</Pressable>
-				<Text style={{ color: normal, marginTop: 8 }}>
-					Watching {people.length}:
-				</Text>
-				{people.length === 0 ? (
-					<Text style={{ color: muted }}>Nobody yet.</Text>
-				) : (
-					people.map(person => (
-						<Pressable
-							key={person.id}
-							accessibilityLabel={'Stop watching ' + (person.name || person.id)}
-							onPress={() => {
-								const next = { ...(settings.people ?? {}) }
-								delete next[person.id]
-								set({ people: next })
-							}}
-							style={{ paddingVertical: 6 }}
-						>
-							<Text style={{ color: normal }}>{person.name || person.id}</Text>
-						</Pressable>
-					))
-				)}
-			</ScrollView>
+					{people.length === 0 ? (
+						<Row label="Nobody yet." subLabel="Hold a message and pick Watch." />
+					) : (
+						people.map(person => (
+							<Row
+								key={person.id}
+								label={person.name || person.id}
+								subLabel={`${person.id} — tap to stop watching`}
+								onPress={() => {
+									const next = { ...(settings.people ?? {}) }
+									delete next[person.id]
+									set({ people: next })
+								}}
+							/>
+						))
+					)}
+				</Section>
+				<Section title="How it stays quiet">
+					<Row
+						label="Coming online, once"
+						subLabel="Only a change out of offline fires, so a client that repeats presence cannot spam you."
+					/>
+					<Row
+						label="Everyone else is ignored"
+						subLabel="Your own messages and anyone not on the list never produce a toast."
+					/>
+					<Note text="No account, no server, no token: the list lives in this plugin's own storage." />
+				</Section>
+			</Page>
 		)
 	},
 })
+
+import { asRecord } from '../../_shared/types'
