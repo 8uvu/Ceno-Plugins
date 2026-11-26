@@ -20,8 +20,6 @@ in the background.
 
 | Plugin | What it does | Version |
 | --- | --- | --- |
-| **Message Deleter** | Hold a message and delete what you sent in that chat: one message, or all of them, a second apart. | 3.1.0 |
-| **Message Logger** | Keeps the edits and deletions this device saw, with the text before and after. | 1.1.0 |
 | **Watchlist** | Get a toast when someone you watch comes online, types to you, or sends a message. | 1.1.0 |
 | **Later** | Hold a message and be pinged about it in an hour, in three hours, or tomorrow. | 1.1.0 |
 | **Bookmarks** | Keep a message on this device: the text, its author, the channel and the time. | 1.0.0 |
@@ -30,57 +28,9 @@ in the background.
 | **Away** | Answers your DMs while you are out, with a reply you wrote. | 1.0.0 |
 | **Waiting on You** | The DMs whose last message is theirs, oldest first. | 1.0.0 |
 | **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.2.0 |
-| **Clean URLs** | Strips tracking parameters from links. | 1.2.0 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.2.0 |
-| **Streaks** | Counts how many days in a row you have talked to someone and shows the count next to their name. | 1.2.0 |
 
 ---
-
-## Message Deleter
-
-Hold a message you sent, or any message in a DM, and the long-press menu offers
-to delete what you wrote. The chat list offers the same run when you hold the
-conversation.
-
-- **One message.** Hold one of your own messages → *Delete this message*.
-- **Every message of yours.** In a DM or group DM → *Delete all my messages*.
-  The run reads the chat a page at a time and deletes as it walks, so it works on
-  a conversation of any length.
-- **Newest first, one request at a time,** a second apart — a walk, not a burst.
-- **Discord's limits are obeyed.** A `429` is waited out for exactly the delay
-  Discord names, then the delete is retried once. A second refusal stops the run
-  and says so instead of retrying into the limit.
-- **Only your own messages.** In a server, a single message can be deleted; the
-  bulk run is only offered in DMs and group DMs.
-- **It asks first,** with the system dialog, after the sheet has closed — so the
-  confirmation is never drawn underneath it.
-- **Stop while it runs:** *Stop deleting (N done)* in the same menu, or the row in
-  the settings page. The message already being deleted finishes.
-
-**Settings page:** what each row does, the last result, and a *Diagnostics*
-group — message menu, chat menu, delete action, chat history — that names the
-piece a build did or did not provide, so a missing row can be reported exactly.
-
-## Message Logger
-
-A local journal of what changed: when a message you saw is edited or deleted,
-the old text is kept so you can still read it.
-
-- **Edits keep both versions.** The page shows `“before” → “after”`, with the
-  author, the channel and how long ago it happened.
-- **Deletions keep the last text.** A message that vanished is listed with what
-  it said while it was still there.
-- **It only logs what it saw.** A message that arrived before the plugin started
-  has no earlier text to compare with, and is not logged — the page says so
-  rather than pretending otherwise.
-- **A journal, not a second chat.** Nothing is uploaded, nothing is re-drawn into
-  the conversation, and the last 500 messages are held in memory only to notice a
-  change.
-- **Capped and clearable:** 200 entries by default (20–1000), with a row that
-  wipes the log.
-
-**Settings page:** the switch, the clear row, what it can and cannot see, and the
-20 most recent entries with their before/after text.
 
 ## Watchlist
 
@@ -217,21 +167,6 @@ newest first, and shows them with names instead of ids.
   filling the list with duplicates.
 - **Clear the list** from the settings page, or switch recording off entirely.
 
-## Clean URLs
-
-Tracking parameters are removed from links as messages arrive and as they are
-edited, before Discord renders them.
-
-- **The usual suspects:** `utm_*`, `fbclid`, `gclid`, `dclid`, `msclkid`,
-  `twclid`, `igshid`, `si`, `mkt_tok`, `_hsenc`, and the other `fb_`, `ga_`,
-  `mc_`, `matomo_`, `pk_` and `mtm_` families.
-- **Add your own** as a comma-separated list in the settings page.
-- **Nothing else changes:** the path, the fragment, the remaining parameters and
-  the surrounding text are left exactly as written, and a link that was already
-  clean is not touched.
-- **Works on what you see.** It rewrites the message the client is about to
-  render; nothing is sent anywhere and the other person's copy is unchanged.
-
 ## Don't Control Me
 
 Being moved, muted, deafened or dropped out of a call by a server admin is
@@ -250,26 +185,6 @@ which of those it does.
 
 **Settings page:** the four switches, the rejoin delay, the pinned channel, and a
 line telling you what it would rejoin right now.
-
-## Streaks
-
-How many days in a row you and someone have talked, counted on this device.
-
-- **A day counts when a message goes either way,** so texting someone starts the
-  streak. *Both sides count* is available if you want a day to need a reply from
-  each of you.
-- **The streak is drawn next to the name** in the chat header, and survives a day
-  with nothing said yet: an empty today starts counting from yesterday.
-- **Local dates,** so a streak survives time zones and daylight saving.
-- **DMs and group DMs only.** Server channels are not counted.
-- **400 days of history per conversation** is kept, and the longest streak is
-  remembered even after a gap.
-- **Reset everything** from the settings page.
-
-**Settings page:** the switches, your best running streak, and every
-conversation ranked by streak with today's count.
-
----
 
 ## How they're built
 
@@ -337,11 +252,7 @@ plugins/
 │   ├── tsconfig.json            # the plugin's own type-check project
 │   ├── verify.cjs               # boots the built bundle and checks it
 │   └── js/index.tsx             # -> index.js
-├── clean-urls/
 ├── dont-control-me/
-├── streaks/
-├── message-deleter/
-├── message-logger/
 ├── watchlist/
 ├── later/
 ├── bookmarks/

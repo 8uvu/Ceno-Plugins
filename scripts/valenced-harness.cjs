@@ -521,7 +521,7 @@ function loadBundle(id, sandbox) {
         }
     }
     // A plugin that stores settings must ship their defaults; one with no
-    // settings at all (Message Deleter keeps nothing) legitimately has none.
+    // settings at all legitimately has none.
     if (definition.jsonStorage && !definition.jsonStorage.default) {
         throw new Error(id + ': bundle is missing jsonStorage defaults');
     }
