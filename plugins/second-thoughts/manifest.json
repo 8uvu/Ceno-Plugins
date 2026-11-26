@@ -1,0 +1,20 @@
+{
+    "format": 1,
+    "id": "dev.8uvu.second-thoughts",
+    "name": "Second Thoughts",
+    "description": "Holds a text message for a few seconds before it leaves, so a typo or the wrong chat can be cancelled.",
+    "author": "cenotaph",
+    "icon": "ClockIcon",
+    "version": "1.0.0",
+    "dependencies": {
+        "valenced.api": {
+            "version": ">=1 <2"
+        },
+        "discord": {
+            "version": "*"
+        }
+    },
+    "dist": {
+        "script": "index.js"
+    }
+}

@@ -27,6 +27,8 @@ in the background.
 | **Waiting on You** | The DMs whose last message is theirs, oldest first. | 1.0.0 |
 | **TypingWatch** | Remembers who started typing, in case the indicator vanished before you looked. | 1.2.0 |
 | **Don't Control Me** | Rejoins calls, returns you to your pinned channel, and undoes server mute and deafen when you have permission. | 1.3.0 |
+| **Voice Time** | Keeps the call history this client does not: every call, how long it lasted, and the time you spent in it with each person. | 1.0.0 |
+| **Second Thoughts** | Holds a text message for a few seconds before it leaves, so a typo or the wrong chat can be cancelled. | 1.0.0 |
 
 ---
 
@@ -153,6 +155,52 @@ which of those it does.
 name, what it would rejoin right now, and a *This build* group naming the join and
 mute actions the client provides.
 
+## Voice Time
+
+The call history Discord does not keep. Every call this device saw is logged with
+where it was, when it started and how long it lasted, and the time is counted per
+person while you are in the call together.
+
+- **A call is between joining and leaving,** or between two channels when you
+  switch — the first is closed at the moment you switch, so nothing is counted
+  twice.
+- **Per person, to the second.** Someone joining late is counted from their join,
+  someone leaving early stops then; nobody is credited for time they were not
+  there.
+- **Short calls are dropped.** Under ten seconds is a menu tap or a failed join,
+  not a call.
+- **Totals for today, this week and all time,** plus a recap toast when you leave
+  a call.
+- **Honest about a closed app.** A call still running when Discord closed cannot
+  be trusted, so it is dropped rather than billed to the hours you were away.
+- **Nothing leaves the device.** No account, no server, no token.
+
+**Settings page:** the recording switch, the four totals, the people you have
+spent the most time with, the last five calls with their length, and one row that
+forgets everything after asking.
+
+## Second Thoughts
+
+A few seconds between pressing send and the message leaving, so the typo you
+notice as your thumb lifts can still be stopped.
+
+- **Hold, then send.** Text messages wait the delay you pick — three, five, eight
+  or twelve seconds — while they sit on the page with their text and how long is
+  left.
+- **Cancel from the page.** The send is dropped before Discord ever sees it, and
+  the text moves to *Cancelled*, so nothing you typed disappears even though the
+  composer may have cleared itself.
+- **DMs held by default, servers not.** Slow mode and busy channels are where a
+  pause is least welcome, so that is a switch rather than a surprise.
+- **Attachments, uploads and slash commands are never held.** They have their own
+  steps and their own timing.
+- **Closing Discord drops what is waiting.** A held message is never sent late.
+- **Nothing is uploaded.** No account, no server, no token.
+
+**Settings page:** the queue with a tap to cancel, the delay, the two switches,
+the cancelled messages, and a *This build* group that says whether the send
+action was found on this build.
+
 ## How they're built
 
 - **Strict TypeScript, no `any`, no native code.** Each plugin is one JS bundle;
@@ -225,6 +273,8 @@ plugins/
 ├── keywords/
 ├── away/
 ├── waiting-on-you/
+├── voice-time/
+├── second-thoughts/
 └── _shared/                     # theme tokens, the page kit and the menu patch
 scripts/                         # the verifier harness and its runner
 themes/                          # theme plugins, built and packaged like plugins/
